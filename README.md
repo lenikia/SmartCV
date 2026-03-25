@@ -94,7 +94,7 @@ GET /applications
 ## Installation
 
 ### 1. Clone the repository
-git clone https://github.com/your-username/smart-cv.git
+git clone https://github.com/your-username/smartcv.git
 
 cd smart-cv
 
