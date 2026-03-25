@@ -96,20 +96,25 @@ GET /applications
 ### 1. Clone the repository
 git clone https://github.com/your-username/smartcv.git
 
-cd smart-cv
+```bash
+cd smartcv
+```
 
 ### 2. Backend setup
+```bash
 cd backend
 python -m venv venv
 source venv/bin/activate # Windows: venv\Scripts\activate
 pip install -r requirements.txt
 uvicorn main:app --reload
-
+```
 
 ### 3. Frontend setup
+```bash
 cd frontend
 npm install
 npm run dev
+```
 
 ---
 
