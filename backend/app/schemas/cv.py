@@ -26,7 +26,7 @@ class Project(BaseModel):
     technologies: Optional[str] = None
     description: Optional[str] = None
 
-# Main CV Schema - This matches your frontend
+# Main CV Schema
 class CVData(BaseModel):
     personalInfo: PersonalInfo
     summary: Optional[str] = None

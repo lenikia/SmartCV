@@ -1,18 +1,20 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-# Create FastAPI app
+# Import the CV router
+from app.routers.cv import router as cv_router
+
 app = FastAPI(
     title="SmartCV Backend",
     description="Backend API for SmartCV - Dynamic CV Builder",
     version="1.0.0"
 )
 
-# CORS settings - Allow your React frontend to connect
+# CORS - Allow frontend to connect
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[
-        "http://localhost:5173",   # Vite default
+        "http://localhost:5173",
         "http://127.0.0.1:5173"
     ],
     allow_credentials=True,
@@ -20,13 +22,16 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+# Include the CV router
+app.include_router(cv_router)
+
 # Root endpoint
 @app.get("/")
 async def root():
     return {
         "message": "🚀 SmartCV Backend is running!",
-        "docs": "/docs",
-        "health": "/health"
+        "docs_url": "/docs",
+        "cv_endpoints": "/api/cv"
     }
 
 # Health check

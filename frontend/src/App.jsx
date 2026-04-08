@@ -1,5 +1,5 @@
 import "./App.css";
-import { useMemo, useState } from "react";
+import { useMemo, useState, useEffect } from "react";
 
 const initialCvData = {
   personalInfo: {
@@ -50,6 +50,51 @@ const initialCvData = {
 function App() {
   const [cvData, setCvData] = useState(initialCvData);
   const [newSkill, setNewSkill] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [message, setMessage] = useState("");
+
+  // Load CV from backend when app starts
+  useEffect(() => {
+    loadCV();
+  }, []);
+
+  const loadCV = async () => {
+    try {
+      const res = await fetch("http://127.0.0.1:8000/api/cv");
+      if (res.ok) {
+        const data = await res.json();
+        setCvData(data);
+        setMessage("✅ Loaded from Backend");
+        setTimeout(() => setMessage(""), 3000);
+      }
+    } catch (err) {
+      console.log("No saved CV yet or backend not reachable");
+    }
+  };
+
+  const saveCV = async () => {
+    setLoading(true);
+    setMessage("");
+
+    try {
+      const res = await fetch("http://127.0.0.1:8000/api/cv", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(cvData),
+      });
+
+      if (res.ok) {
+        setMessage("✅ CV Saved Successfully to Backend!");
+      } else {
+        setMessage("❌ Failed to save to Backend");
+      }
+    } catch (err) {
+      setMessage("❌ Cannot connect to Backend. Make sure backend server is running.");
+    }
+
+    setLoading(false);
+    setTimeout(() => setMessage(""), 4000);
+  };
 
   const fullContactLine = useMemo(() => {
     const { email, phone, location } = cvData.personalInfo;
@@ -103,16 +148,12 @@ function App() {
 
   const addSkill = () => {
     const trimmedSkill = newSkill.trim();
-
-    if (!trimmedSkill || cvData.skills.includes(trimmedSkill)) {
-      return;
-    }
+    if (!trimmedSkill || cvData.skills.includes(trimmedSkill)) return;
 
     setCvData((prev) => ({
       ...prev,
       skills: [...prev.skills, trimmedSkill],
     }));
-
     setNewSkill("");
   };
 
@@ -131,7 +172,6 @@ function App() {
       period: "",
       description: "",
     };
-
     setCvData((prev) => ({
       ...prev,
       experience: [...prev.experience, newExperience],
@@ -152,7 +192,6 @@ function App() {
       technologies: "",
       description: "",
     };
-
     setCvData((prev) => ({
       ...prev,
       projects: [...prev.projects, newProject],
@@ -169,6 +208,7 @@ function App() {
   const resetForm = () => {
     setCvData(initialCvData);
     setNewSkill("");
+    setMessage("");
   };
 
   return (
@@ -182,10 +222,37 @@ function App() {
           </p>
         </div>
 
-        <button className="secondary-btn" onClick={resetForm}>
-          Reset Data
-        </button>
+        <div style={{ display: "flex", gap: "12px", flexWrap: "wrap" }}>
+          <button 
+            className="primary-btn" 
+            onClick={saveCV} 
+            disabled={loading}
+          >
+            {loading ? "Saving..." : "💾 Save to Backend"}
+          </button>
+          <button className="secondary-btn" onClick={loadCV}>
+            🔄 Load from Backend
+          </button>
+          <button className="secondary-btn" onClick={resetForm}>
+            Reset Data
+          </button>
+        </div>
       </header>
+
+      {message && (
+        <div style={{
+          textAlign: "center",
+          padding: "12px",
+          margin: "10px auto",
+          maxWidth: "1600px",
+          backgroundColor: message.includes("✅") ? "#d1fae5" : "#fee2e2",
+          color: message.includes("✅") ? "#166534" : "#b91c1c",
+          borderRadius: "12px",
+          fontWeight: "500"
+        }}>
+          {message}
+        </div>
+      )}
 
       <main className="app-layout">
         <section className="editor-panel">
@@ -194,89 +261,70 @@ function App() {
             <p>Fill in the form to update the CV preview in real time.</p>
           </div>
 
+          {/* Personal Information */}
           <div className="form-block">
             <h3>Personal Information</h3>
-
             <div className="form-grid">
               <div className="input-group">
                 <label>Full Name</label>
                 <input
                   type="text"
                   value={cvData.personalInfo.fullName}
-                  onChange={(e) =>
-                    handlePersonalInfoChange("fullName", e.target.value)
-                  }
+                  onChange={(e) => handlePersonalInfoChange("fullName", e.target.value)}
                 />
               </div>
-
               <div className="input-group">
                 <label>Professional Title</label>
                 <input
                   type="text"
                   value={cvData.personalInfo.professionalTitle}
-                  onChange={(e) =>
-                    handlePersonalInfoChange("professionalTitle", e.target.value)
-                  }
+                  onChange={(e) => handlePersonalInfoChange("professionalTitle", e.target.value)}
                 />
               </div>
-
               <div className="input-group">
                 <label>Email</label>
                 <input
                   type="email"
                   value={cvData.personalInfo.email}
-                  onChange={(e) =>
-                    handlePersonalInfoChange("email", e.target.value)
-                  }
+                  onChange={(e) => handlePersonalInfoChange("email", e.target.value)}
                 />
               </div>
-
               <div className="input-group">
                 <label>Phone</label>
                 <input
                   type="text"
                   value={cvData.personalInfo.phone}
-                  onChange={(e) =>
-                    handlePersonalInfoChange("phone", e.target.value)
-                  }
+                  onChange={(e) => handlePersonalInfoChange("phone", e.target.value)}
                 />
               </div>
-
               <div className="input-group">
                 <label>Location</label>
                 <input
                   type="text"
                   value={cvData.personalInfo.location}
-                  onChange={(e) =>
-                    handlePersonalInfoChange("location", e.target.value)
-                  }
+                  onChange={(e) => handlePersonalInfoChange("location", e.target.value)}
                 />
               </div>
-
               <div className="input-group">
                 <label>LinkedIn</label>
                 <input
                   type="text"
                   value={cvData.personalInfo.linkedin}
-                  onChange={(e) =>
-                    handlePersonalInfoChange("linkedin", e.target.value)
-                  }
+                  onChange={(e) => handlePersonalInfoChange("linkedin", e.target.value)}
                 />
               </div>
-
               <div className="input-group full-width">
                 <label>GitHub</label>
                 <input
                   type="text"
                   value={cvData.personalInfo.github}
-                  onChange={(e) =>
-                    handlePersonalInfoChange("github", e.target.value)
-                  }
+                  onChange={(e) => handlePersonalInfoChange("github", e.target.value)}
                 />
               </div>
             </div>
           </div>
 
+          {/* Summary */}
           <div className="form-block">
             <h3>Professional Summary</h3>
             <div className="input-group">
@@ -289,48 +337,40 @@ function App() {
             </div>
           </div>
 
+          {/* Education */}
           <div className="form-block">
             <h3>Education</h3>
-
             <div className="form-grid">
               <div className="input-group">
                 <label>Institution</label>
                 <input
                   type="text"
                   value={cvData.education.institution}
-                  onChange={(e) =>
-                    handleEducationChange("institution", e.target.value)
-                  }
+                  onChange={(e) => handleEducationChange("institution", e.target.value)}
                 />
               </div>
-
               <div className="input-group">
                 <label>Degree</label>
                 <input
                   type="text"
                   value={cvData.education.degree}
-                  onChange={(e) =>
-                    handleEducationChange("degree", e.target.value)
-                  }
+                  onChange={(e) => handleEducationChange("degree", e.target.value)}
                 />
               </div>
-
               <div className="input-group full-width">
                 <label>Period</label>
                 <input
                   type="text"
                   value={cvData.education.period}
-                  onChange={(e) =>
-                    handleEducationChange("period", e.target.value)
-                  }
+                  onChange={(e) => handleEducationChange("period", e.target.value)}
                 />
               </div>
             </div>
           </div>
 
+          {/* Skills */}
           <div className="form-block">
             <h3>Skills</h3>
-
             <div className="skill-input-row">
               <input
                 type="text"
@@ -353,6 +393,7 @@ function App() {
             </div>
           </div>
 
+          {/* Experience */}
           <div className="form-block">
             <div className="section-title-row">
               <h3>Experience</h3>
@@ -365,60 +406,41 @@ function App() {
               <div className="card-block" key={item.id}>
                 <div className="card-header">
                   <h4>Experience Entry</h4>
-                  <button
-                    className="danger-btn"
-                    onClick={() => removeExperience(item.id)}
-                  >
+                  <button className="danger-btn" onClick={() => removeExperience(item.id)}>
                     Remove
                   </button>
                 </div>
-
                 <div className="form-grid">
                   <div className="input-group">
                     <label>Role</label>
                     <input
                       type="text"
                       value={item.role}
-                      onChange={(e) =>
-                        handleExperienceChange(item.id, "role", e.target.value)
-                      }
+                      onChange={(e) => handleExperienceChange(item.id, "role", e.target.value)}
                     />
                   </div>
-
                   <div className="input-group">
                     <label>Company</label>
                     <input
                       type="text"
                       value={item.company}
-                      onChange={(e) =>
-                        handleExperienceChange(item.id, "company", e.target.value)
-                      }
+                      onChange={(e) => handleExperienceChange(item.id, "company", e.target.value)}
                     />
                   </div>
-
                   <div className="input-group full-width">
                     <label>Period</label>
                     <input
                       type="text"
                       value={item.period}
-                      onChange={(e) =>
-                        handleExperienceChange(item.id, "period", e.target.value)
-                      }
+                      onChange={(e) => handleExperienceChange(item.id, "period", e.target.value)}
                     />
                   </div>
-
                   <div className="input-group full-width">
                     <label>Description</label>
                     <textarea
                       rows="4"
                       value={item.description}
-                      onChange={(e) =>
-                        handleExperienceChange(
-                          item.id,
-                          "description",
-                          e.target.value
-                        )
-                      }
+                      onChange={(e) => handleExperienceChange(item.id, "description", e.target.value)}
                     />
                   </div>
                 </div>
@@ -426,6 +448,7 @@ function App() {
             ))}
           </div>
 
+          {/* Projects */}
           <div className="form-block">
             <div className="section-title-row">
               <h3>Projects</h3>
@@ -438,53 +461,33 @@ function App() {
               <div className="card-block" key={item.id}>
                 <div className="card-header">
                   <h4>Project Entry</h4>
-                  <button
-                    className="danger-btn"
-                    onClick={() => removeProject(item.id)}
-                  >
+                  <button className="danger-btn" onClick={() => removeProject(item.id)}>
                     Remove
                   </button>
                 </div>
-
                 <div className="form-grid">
                   <div className="input-group">
                     <label>Project Name</label>
                     <input
                       type="text"
                       value={item.name}
-                      onChange={(e) =>
-                        handleProjectChange(item.id, "name", e.target.value)
-                      }
+                      onChange={(e) => handleProjectChange(item.id, "name", e.target.value)}
                     />
                   </div>
-
                   <div className="input-group">
                     <label>Technologies</label>
                     <input
                       type="text"
                       value={item.technologies}
-                      onChange={(e) =>
-                        handleProjectChange(
-                          item.id,
-                          "technologies",
-                          e.target.value
-                        )
-                      }
+                      onChange={(e) => handleProjectChange(item.id, "technologies", e.target.value)}
                     />
                   </div>
-
                   <div className="input-group full-width">
                     <label>Description</label>
                     <textarea
                       rows="4"
                       value={item.description}
-                      onChange={(e) =>
-                        handleProjectChange(
-                          item.id,
-                          "description",
-                          e.target.value
-                        )
-                      }
+                      onChange={(e) => handleProjectChange(item.id, "description", e.target.value)}
                     />
                   </div>
                 </div>
@@ -517,9 +520,7 @@ function App() {
 
             <section className="cv-section">
               <h3>Education</h3>
-              <p>
-                <strong>{cvData.education.degree}</strong>
-              </p>
+              <p><strong>{cvData.education.degree}</strong></p>
               <p>{cvData.education.institution}</p>
               <p>{cvData.education.period}</p>
             </section>
@@ -539,9 +540,7 @@ function App() {
               <h3>Experience</h3>
               {cvData.experience.map((item) => (
                 <div className="preview-entry" key={item.id}>
-                  <h4>
-                    {item.role} {item.company ? `- ${item.company}` : ""}
-                  </h4>
+                  <h4>{item.role} {item.company ? `- ${item.company}` : ""}</h4>
                   <p className="entry-period">{item.period}</p>
                   <p>{item.description}</p>
                 </div>
