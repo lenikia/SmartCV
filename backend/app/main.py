@@ -1,13 +1,11 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-
-# Import the CV router
-from app.routers.cv import router as cv_router
+from app.routers import cv
 
 app = FastAPI(
-    title="SmartCV Backend",
-    description="Backend API for SmartCV - Dynamic CV Builder",
-    version="1.0.0"
+    title="CV Controller App",
+    description="AI-powered CV management and optimization platform",
+    version="2.0.0"
 )
 
 # CORS - Allow frontend to connect
@@ -15,26 +13,42 @@ app.add_middleware(
     CORSMiddleware,
     allow_origins=[
         "http://localhost:5173",
-        "http://127.0.0.1:5173"
+        "http://127.0.0.1:5173",
+        "http://localhost:3000"
     ],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
-# Include the CV router
-app.include_router(cv_router)
+# Include routers
+app.include_router(cv.router)
 
-# Root endpoint
 @app.get("/")
 async def root():
     return {
-        "message": "🚀 SmartCV Backend is running!",
+        "message": "🚀 CV Controller App Backend is running!",
+        "version": "2.0.0",
+        "features": [
+            "CV Upload & Parsing",
+            "ATS Compatibility Checking",
+            "Multi-CV Management",
+            "Bulk Updates Across All CVs",
+            "Position Matching",
+            "CV Dashboard"
+        ],
         "docs_url": "/docs",
-        "cv_endpoints": "/api/cv"
+        "endpoints": {
+            "upload_cv": "POST /api/cv/upload",
+            "create_blank": "POST /api/cv/create-blank",
+            "view_cv": "GET /api/cv/{id}/view",
+            "edit_cv": "GET /api/cv/{id}/edit",
+            "update_cv": "PUT /api/cv/{id}",
+            "all_cvs": "GET /api/cv/all",
+            "quick_start": "GET /api/cv/quick-start/options"
+        }
     }
 
-# Health check
 @app.get("/health")
 async def health():
-    return {"status": "healthy", "service": "SmartCV Backend"}
+    return {"status": "healthy", "service": "CV Controller App"}

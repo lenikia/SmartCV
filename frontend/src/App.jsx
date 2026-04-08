@@ -54,9 +54,6 @@ function App() {
   const [message, setMessage] = useState("");
 
   // Load CV from backend when app starts
-  useEffect(() => {
-    loadCV();
-  }, []);
 
   const loadCV = async () => {
     try {
@@ -67,12 +64,13 @@ function App() {
         setMessage("✅ Loaded from Backend");
         setTimeout(() => setMessage(""), 3000);
       }
+    // eslint-disable-next-line no-unused-vars
     } catch (err) {
       console.log("No saved CV yet or backend not reachable");
     }
   };
 
-  const saveCV = async () => {
+const saveCV = async () => {
     setLoading(true);
     setMessage("");
 
@@ -88,6 +86,7 @@ function App() {
       } else {
         setMessage("❌ Failed to save to Backend");
       }
+    // eslint-disable-next-line no-unused-vars
     } catch (err) {
       setMessage("❌ Cannot connect to Backend. Make sure backend server is running.");
     }
@@ -95,6 +94,12 @@ function App() {
     setLoading(false);
     setTimeout(() => setMessage(""), 4000);
   };
+
+  // Automatically load CV from backend when the app starts
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    loadCV();
+  }, []);
 
   const fullContactLine = useMemo(() => {
     const { email, phone, location } = cvData.personalInfo;
