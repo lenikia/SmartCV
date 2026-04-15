@@ -1,14 +1,12 @@
 import { Link, useNavigate } from "react-router-dom";
 import { useState } from "react";
 
-function SignUp() {
+function SignIn() {
   const navigate = useNavigate();
 
   const [formData, setFormData] = useState({
-    fullName: "",
     email: "",
     password: "",
-    confirmPassword: "",
   });
 
   const [error, setError] = useState("");
@@ -23,18 +21,8 @@ function SignUp() {
   const handleSubmit = (e) => {
     e.preventDefault();
 
-    if (
-      !formData.fullName.trim() ||
-      !formData.email.trim() ||
-      !formData.password.trim() ||
-      !formData.confirmPassword.trim()
-    ) {
-      setError("Please fill in all fields.");
-      return;
-    }
-
-    if (formData.password !== formData.confirmPassword) {
-      setError("Passwords do not match.");
+    if (!formData.email.trim() || !formData.password.trim()) {
+      setError("Please enter your email and password.");
       return;
     }
 
@@ -42,7 +30,6 @@ function SignUp() {
 
     // Temporary simulation while the backend is not ready 
     localStorage.setItem("mockAuth", "true");
-    localStorage.setItem("mockUserName", formData.fullName);
     localStorage.setItem("mockUserEmail", formData.email);
 
     // then we switch to /dashboard;
@@ -61,26 +48,15 @@ function SignUp() {
 
         <div className="auth-card">
           <div className="auth-header">
-            <span className="eyebrow">Get Started</span>
-            <h1>Create your SmartCV account</h1>
+            <span className="eyebrow">Welcome Back</span>
+            <h1>Sign in to your SmartCV account</h1>
             <p>
-              Start building stronger resumes, improve ATS readiness, and manage
-              your career documents in one place.
+              Access your resumes, continue improving your CV, and manage your
+              professional documents in one place.
             </p>
           </div>
 
           <form className="auth-form" onSubmit={handleSubmit}>
-            <div className="input-group">
-              <label htmlFor="fullName">Full Name</label>
-              <input
-                id="fullName"
-                type="text"
-                placeholder="Enter your full name"
-                value={formData.fullName}
-                onChange={(e) => handleChange("fullName", e.target.value)}
-              />
-            </div>
-
             <div className="input-group">
               <label htmlFor="email">Email</label>
               <input
@@ -97,29 +73,16 @@ function SignUp() {
               <input
                 id="password"
                 type="password"
-                placeholder="Create a password"
+                placeholder="Enter your password"
                 value={formData.password}
                 onChange={(e) => handleChange("password", e.target.value)}
-              />
-            </div>
-
-            <div className="input-group">
-              <label htmlFor="confirmPassword">Confirm Password</label>
-              <input
-                id="confirmPassword"
-                type="password"
-                placeholder="Confirm your password"
-                value={formData.confirmPassword}
-                onChange={(e) =>
-                  handleChange("confirmPassword", e.target.value)
-                }
               />
             </div>
 
             {error && <p className="auth-error">{error}</p>}
 
             <button type="submit" className="primary-btn auth-submit-btn">
-              Create Account
+              Sign In
             </button>
           </form>
 
@@ -133,9 +96,9 @@ function SignUp() {
 
           <div className="auth-footer">
             <p>
-              Already have an account?{" "}
-              <Link to="/signin" className="auth-inline-link">
-                Sign In
+              Don&apos;t have an account?{" "}
+              <Link to="/signup" className="auth-inline-link">
+                Start Free
               </Link>
             </p>
 
@@ -149,4 +112,4 @@ function SignUp() {
   );
 }
 
-export default SignUp;
+export default SignIn;
