@@ -2,20 +2,28 @@
 
 ## Description
 
-SmartCV is a web application that transforms the traditional static CV into a dynamic and customizable career management platform. Instead of manually rewriting resumes for different job applications, users can organize their experience, projects, and skills in one place and generate tailored CV versions for specific roles such as Machine Learning, Backend Development, or Data Science. The platform also integrates a professional portfolio, application tracking, and contact management, making it a complete tool for personal branding and career growth.
+SmartCV, a web application that lets users create, manage and export tailored CVs based on a job title or job description. The platform uses AI (Srill to be determined) to score CVs against Job Descriptions or Job Positions (Additional feature takes an linkedin job post & creates a CV from scratch), analysing keywords and sentence quality, which in turn returns actionable improvement suggestions. Users also get a job application tracker dashboard, allowing them to check out the (in discussion) real time/live job postings from different platforms in one place.
 
 ---
+## Core user flow
 
-## Objectives
-
-- Simplify CV customization for different job roles  
-- Centralize professional information (projects, skills, experience)  
-- Improve online professional presence  
-- Enable tracking of job applications  
-- Provide a scalable and reusable portfolio platform  
-
+1. User signs up and builds their base profile (experience, skills, education, projects)
+2. User creates a CV — either from scratch via the builder form, or by uploading an existing file
+3. User pastes a job description or enters a job title
+4. AI analyses the CV against the JD: returns a score (0–100), matched keywords, missing keywords, and sentence improvement tips
+5. User refines their CV based on suggestions and exports as PDF or DOCX
+6. User saves multiple CV versions per role (e.g. "ML Engineer v2", "Backend Dev v1")
+6. User tracks all job applications in the built-in tracker (status, salary, notes, timeline)
 ---
+## Key screens
 
+1. Home / landing: hero with Create CV and Upload CV CTAs
+2. Dashboard: tabbed layout — CV Management tab + Job Tracker tab
+3. CV builder: multi-step form with live preview panel
+4. Score dashboard: keyword match list, sentence quality scores, improvement tips
+5. Job tracker: table view (Company / Role / Location / Salary / Status), Chart view, Calendar view
+6.Document manager: list of uploaded CVs and cover letters with Primary badge
+---
 ## Features
 
 - Professional profile management  
