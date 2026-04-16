@@ -1,54 +1,45 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from app.routers import cv
+from fastapi.security import OAuth2PasswordBearer
+from app.core.config import settings
+
+# Import routers
+from app.routers import auth, cv
 
 app = FastAPI(
-    title="CV Controller App",
-    description="AI-powered CV management and optimization platform",
-    version="2.0.0"
+    title=settings.PROJECT_NAME,
+    description="SmartCV Backend API - Dynamic CV Builder",
+    version="1.0.0",
+    # This line helps Swagger show the Authorize button
+    openapi_tags=[
+        {"name": "Authentication", "description": "User authentication endpoints"},
+        {"name": "CV", "description": "CV management endpoints"}
+    ]
 )
 
-# CORS - Allow frontend to connect
+# CORS
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[
-        "http://localhost:5173",
-        "http://127.0.0.1:5173",
-        "http://localhost:3000"
-    ],
+    allow_origins=["http://localhost:5173", "http://127.0.0.1:5173"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
+# Security scheme (this makes the Authorize button appear)
+oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/v1/auth/login")
+
 # Include routers
-app.include_router(cv.router)
+app.include_router(auth.router, prefix=settings.API_V1_STR)
+app.include_router(cv.router, prefix=settings.API_V1_STR)
 
 @app.get("/")
 async def root():
     return {
-        "message": "🚀 CV Controller App Backend is running!",
-        "version": "2.0.0",
-        "features": [
-            "CV Upload & Parsing",
-            "ATS Compatibility Checking",
-            "Multi-CV Management",
-            "Bulk Updates Across All CVs",
-            "Position Matching",
-            "CV Dashboard"
-        ],
-        "docs_url": "/docs",
-        "endpoints": {
-            "upload_cv": "POST /api/cv/upload",
-            "create_blank": "POST /api/cv/create-blank",
-            "view_cv": "GET /api/cv/{id}/view",
-            "edit_cv": "GET /api/cv/{id}/edit",
-            "update_cv": "PUT /api/cv/{id}",
-            "all_cvs": "GET /api/cv/all",
-            "quick_start": "GET /api/cv/quick-start/options"
-        }
+        "message": "🚀 SmartCV Backend is running successfully!",
+        "docs": "/docs"
     }
 
 @app.get("/health")
 async def health():
-    return {"status": "healthy", "service": "CV Controller App"}
+    return {"status": "healthy"}

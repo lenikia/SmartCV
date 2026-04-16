@@ -1,22 +1,27 @@
-from sqlalchemy import Column, Integer, String, JSON, ForeignKey, DateTime
-from sqlalchemy.orm import relationship
+from sqlalchemy import Column, Integer, String, Text, DateTime, ForeignKey, JSON
 from sqlalchemy.sql import func
-from app.core.database import Base
+from sqlalchemy.orm import relationship
+from app.database import Base
 
-class CVVersion(Base):
-    __tablename__ = "cv_versions"
-    
+class CV(Base):
+    __tablename__ = "cvs"
+
     id = Column(Integer, primary_key=True, index=True)
-    user_id = Column(Integer, ForeignKey("users.id"))
-    version_name = Column(String)  # e.g., "Machine Learning CV", "Backend CV"
-    role_type = Column(String)  # ML, Backend, Data Science
-    personal_info = Column(JSON)
-    summary = Column(String)
-    education = Column(JSON)
-    skills = Column(JSON)
-    experience = Column(JSON)
-    projects = Column(JSON)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    
+    title = Column(String, default="My CV")
+    
+    # Store the entire CV data as JSON for flexibility
+    personal_info = Column(JSON, nullable=False)
+    summary = Column(Text, nullable=True)
+    education = Column(JSON, nullable=True)
+    skills = Column(JSON, nullable=True)           # list of strings
+    experience = Column(JSON, nullable=True)       # list of dicts
+    projects = Column(JSON, nullable=True)         # list of dicts
+
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())
-    
-    user = relationship("User", back_populates="cv_versions")
+
+    # Relationship with User
+    user = relationship("User", back_populates="cvs")
+
