@@ -13,12 +13,16 @@ router = APIRouter(prefix="/cv", tags=["CV"])
 
 def get_current_user(authorization: str = None, db: Session = Depends(get_db)):
     if not authorization or not authorization.startswith("Bearer "):
-        raise HTTPException(status_code=401, detail="Not authenticated")
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Not authenticated",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
     
     token = authorization[7:]
     try:
         payload = jwt.decode(token, settings.SECRET_KEY, algorithms=[settings.ALGORITHM])
-        email = payload.get("sub")
+        email: str = payload.get("sub")
         if email is None:
             raise HTTPException(status_code=401, detail="Invalid token")
     except JWTError:
@@ -34,7 +38,7 @@ def get_current_user(authorization: str = None, db: Session = Depends(get_db)):
 def create_cv(cv_data: CVCreate, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
     new_cv = CV(
         user_id=current_user.id,
-        title=cv_data.title or f"My CV - {datetime.now().strftime('%Y-%m-%d')}",
+        title=cv_data.title or f"My CV - {datetime.now().strftime('%Y-%m-%d %H:%M')}",
         personal_info=cv_data.personalInfo.dict(),
         summary=cv_data.summary,
         education=cv_data.education,
@@ -42,11 +46,11 @@ def create_cv(cv_data: CVCreate, db: Session = Depends(get_db), current_user: Us
         experience=[exp.dict() for exp in cv_data.experience],
         projects=[proj.dict() for proj in cv_data.projects],
     )
-    
+
     db.add(new_cv)
     db.commit()
     db.refresh(new_cv)
-    
+
     return CVResponse(
         id=new_cv.id,
         user_id=new_cv.user_id,
@@ -64,7 +68,8 @@ def create_cv(cv_data: CVCreate, db: Session = Depends(get_db), current_user: Us
 
 @router.get("/", response_model=List[CVResponse])
 def get_my_cvs(db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
-    cvs = db.query(CV).filter(CV.user_id == current_user.id).all()
+    cvs = db.query(CV).filter(CV.user_id == current_user.id).order_by(CV.created_at.desc()).all()
+    
     return [
         CVResponse(
             id=cv.id,
@@ -86,7 +91,7 @@ def get_my_cvs(db: Session = Depends(get_db), current_user: User = Depends(get_c
 def get_cv(cv_id: int, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
     cv = db.query(CV).filter(CV.id == cv_id, CV.user_id == current_user.id).first()
     if not cv:
-        raise HTTPException(status_code=404, detail="CV not found")
+        raise HTTPException(status_code=404, detail="CV not found or you don't have permission")
     return CVResponse(
         id=cv.id,
         user_id=cv.user_id,
@@ -106,7 +111,7 @@ def get_cv(cv_id: int, db: Session = Depends(get_db), current_user: User = Depen
 def update_cv(cv_id: int, cv_data: CVCreate, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
     cv = db.query(CV).filter(CV.id == cv_id, CV.user_id == current_user.id).first()
     if not cv:
-        raise HTTPException(status_code=404, detail="CV not found")
+        raise HTTPException(status_code=404, detail="CV not found or you don't have permission")
 
     cv.title = cv_data.title or cv.title
     cv.personal_info = cv_data.personalInfo.dict()
@@ -119,15 +124,51 @@ def update_cv(cv_id: int, cv_data: CVCreate, db: Session = Depends(get_db), curr
 
     db.commit()
     db.refresh(cv)
-    return CVResponse.from_orm(cv)   # or manually map like above
+    return CVResponse(
+        id=cv.id,
+        user_id=cv.user_id,
+        title=cv.title,
+        personalInfo=cv.personal_info,
+        summary=cv.summary,
+        education=cv.education,
+        skills=cv.skills,
+        experience=cv.experience,
+        projects=cv.projects,
+        created_at=cv.created_at,
+        updated_at=cv.updated_at,
+    )
 
 
 @router.delete("/{cv_id}")
 def delete_cv(cv_id: int, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
     cv = db.query(CV).filter(CV.id == cv_id, CV.user_id == current_user.id).first()
     if not cv:
-        raise HTTPException(status_code=404, detail="CV not found")
+        raise HTTPException(status_code=404, detail="CV not found or you don't have permission")
 
     db.delete(cv)
     db.commit()
     return {"message": "CV deleted successfully"}
+
+@router.get("/{cv_id}/export", response_model=CVResponse)
+def export_cv(cv_id: int, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+    """
+    Export CV - Returns full CV data ready for PDF generation or download
+    Frontend can use this to generate PDF or display nicely
+    """
+    cv = db.query(CV).filter(CV.id == cv_id, CV.user_id == current_user.id).first()
+    if not cv:
+        raise HTTPException(status_code=404, detail="CV not found or you don't have permission")
+    
+    return CVResponse(
+        id=cv.id,
+        user_id=cv.user_id,
+        title=cv.title,
+        personalInfo=cv.personal_info,
+        summary=cv.summary,
+        education=cv.education,
+        skills=cv.skills,
+        experience=cv.experience,
+        projects=cv.projects,
+        created_at=cv.created_at,
+        updated_at=cv.updated_at,
+    )

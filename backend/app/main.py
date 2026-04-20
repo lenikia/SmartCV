@@ -2,7 +2,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.security import OAuth2PasswordBearer
 from app.core.config import settings
-from app.routers import auth, cv, profile
+from app.routers import auth, cv, profile, upload
 
 # Import routers
 from app.routers import auth, cv
@@ -34,6 +34,7 @@ oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/v1/auth/login")
 app.include_router(auth.router, prefix=settings.API_V1_STR)
 app.include_router(cv.router, prefix=settings.API_V1_STR)
 app.include_router(profile.router, prefix=settings.API_V1_STR)
+app.include_router(upload.router, prefix=settings.API_V1_STR)
 
 @app.get("/")
 async def root():
