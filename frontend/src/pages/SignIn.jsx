@@ -1,40 +1,45 @@
 import { Link, useNavigate } from "react-router-dom";
 import { useState } from "react";
+import { login } from "../api/auth";
 
 function SignIn() {
-  const navigate = useNavigate();
+    const navigate = useNavigate();
 
-  const [formData, setFormData] = useState({
-    email: "",
-    password: "",
-  });
+    const [formData, setFormData] = useState({ email: "", password: "" });
+    const [error, setError] = useState("");
+    const [loading, setLoading] = useState(false);
 
-  const [error, setError] = useState("");
+    const handleChange = (field, value) => {
+        setFormData((prev) => ({ ...prev, [field]: value }));
+    };
 
-  const handleChange = (field, value) => {
-    setFormData((prev) => ({
-      ...prev,
-      [field]: value,
-    }));
-  };
+    const handleSubmit = async (e) => {
+        e.preventDefault();
 
-  const handleSubmit = (e) => {
-    e.preventDefault();
+        if (!formData.email.trim() || !formData.password.trim()) {
+            setError("Please enter your email and password.");
+            return;
+        }
 
-    if (!formData.email.trim() || !formData.password.trim()) {
-      setError("Please enter your email and password.");
-      return;
-    }
+        setError("");
+        setLoading(true);
 
-    setError("");
+        try {
+            const data = await login(formData.email, formData.password);
 
-    // Temporary simulation while the backend is not ready 
-    localStorage.setItem("mockAuth", "true");
-    localStorage.setItem("mockUserEmail", formData.email);
+            // Store the JWT token in localStorage
+            // This is the real token — all future API calls read from here
+            // and attach it as the Authorization header
+            localStorage.setItem("token", data.access_token);
 
-    // then we switch to /dashboard;
-    navigate("/dashboard");
-  };
+            navigate("/dashboard");
+
+        } catch (err) {
+            setError(err.message);
+        } finally {
+            setLoading(false);
+        }
+    };
 
   return (
     <div className="auth-page">
