@@ -3,6 +3,11 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.security import OAuth2PasswordBearer
 from app.core.config import settings
 from app.routers import auth, cv, profile, upload
+from app.routers import application, score
+from app.database import engine, Base
+
+from app.models import user, cv as cv_model  # noqa: F401
+from app.models import application as application_model  # noqa: F401
 
 app = FastAPI(
     title=settings.PROJECT_NAME,
@@ -10,21 +15,23 @@ app = FastAPI(
     version="1.0.0",
     openapi_tags=[
         {"name": "Authentication", "description": "User authentication endpoints"},
-        {"name": "CV", "description": "CV management endpoints"}
+        {"name": "CV", "description": "CV management endpoints"},
+        {"name": "Applications", "description": "Job application tracker endpoints"},
+        {"name": "Score", "description": "AI CV scoring endpoints"},
     ]
 )
 
+Base.metadata.create_all(bind=engine)
+
 app.add_middleware(
     CORSMiddleware,
-    # In development, allow both 5173 and 5174 since Vite bumps the port
-    # when one is already taken. In production this becomes your real domain.
     allow_origins=[
         "http://localhost:5173",
         "http://localhost:5174",
         "http://127.0.0.1:5173",
         "http://127.0.0.1:5174",
     ],
-    allow_credentials=True,  # required for Authorization headers to pass through
+    allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
@@ -35,13 +42,12 @@ app.include_router(auth.router, prefix=settings.API_V1_STR)
 app.include_router(cv.router, prefix=settings.API_V1_STR)
 app.include_router(profile.router, prefix=settings.API_V1_STR)
 app.include_router(upload.router, prefix=settings.API_V1_STR)
+app.include_router(application.router, prefix=settings.API_V1_STR)
+app.include_router(score.router, prefix=settings.API_V1_STR)
 
 @app.get("/")
 async def root():
-    return {
-        "message": "🚀 SmartCV Backend is running successfully!",
-        "docs": "/docs"
-    }
+    return {"message": "🚀 SmartCV Backend is running successfully!", "docs": "/docs"}
 
 @app.get("/health")
 async def health():

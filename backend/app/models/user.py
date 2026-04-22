@@ -15,3 +15,4 @@ class User(Base):
 
     # Relationship with CVs
     cvs = relationship("CV", back_populates="user", cascade="all, delete-orphan")
+    applications = relationship("Application", back_populates="user", cascade="all, delete-orphan")

@@ -1,9 +1,8 @@
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
 from app.database import get_db
 from app.models.user import User
-from app.schemas.user import UserResponse
-from app.core.config import settings
+from app.schemas.user import UserResponse, UserUpdate
 from app.utils.dependencies import get_current_user
 
 router = APIRouter(prefix="/profile", tags=["Profile"])
@@ -16,14 +15,16 @@ def get_profile(current_user: User = Depends(get_current_user)):
 
 @router.put("/", response_model=UserResponse)
 def update_profile(
-    full_name: str = None, 
-    db: Session = Depends(get_db), 
+    update_data: UserUpdate,
+    db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
     """Update current user's profile"""
-    if full_name:
-        current_user.full_name = full_name
-    
+    if update_data.full_name is not None:
+        current_user.full_name = update_data.full_name
+    if update_data.email is not None:
+        current_user.email = update_data.email
+
     db.commit()
     db.refresh(current_user)
     return current_user
