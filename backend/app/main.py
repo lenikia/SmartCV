@@ -4,33 +4,33 @@ from fastapi.security import OAuth2PasswordBearer
 from app.core.config import settings
 from app.routers import auth, cv, profile, upload
 
-# Import routers
-from app.routers import auth, cv
-
 app = FastAPI(
     title=settings.PROJECT_NAME,
     description="SmartCV Backend API - Dynamic CV Builder",
     version="1.0.0",
-    # This line helps Swagger show the Authorize button
     openapi_tags=[
         {"name": "Authentication", "description": "User authentication endpoints"},
         {"name": "CV", "description": "CV management endpoints"}
     ]
 )
 
-# CORS
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:5173", "http://127.0.0.1:5173"],
-    allow_credentials=True,
+    # In development, allow both 5173 and 5174 since Vite bumps the port
+    # when one is already taken. In production this becomes your real domain.
+    allow_origins=[
+        "http://localhost:5173",
+        "http://localhost:5174",
+        "http://127.0.0.1:5173",
+        "http://127.0.0.1:5174",
+    ],
+    allow_credentials=True,  # required for Authorization headers to pass through
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
-# Security scheme (this makes the Authorize button appear)
-oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/v1/auth/login")
+oauth2_scheme = OAuth2PasswordBearer(tokenUrl=f"{settings.API_V1_STR}/auth/login")
 
-# Include routers
 app.include_router(auth.router, prefix=settings.API_V1_STR)
 app.include_router(cv.router, prefix=settings.API_V1_STR)
 app.include_router(profile.router, prefix=settings.API_V1_STR)
