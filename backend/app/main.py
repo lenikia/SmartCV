@@ -3,11 +3,10 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.security import OAuth2PasswordBearer
 from app.core.config import settings
 from app.routers import auth, cv, profile, upload
-from app.routers import application, score
 from app.database import engine, Base
 
-from app.models import user, cv as cv_model  # noqa: F401
-from app.models import application as application_model  # noqa: F401
+# Model imports — required for create_all to know about all tables
+from app.models import user, cv as cv_model, profile as profile_model
 
 app = FastAPI(
     title=settings.PROJECT_NAME,
@@ -16,12 +15,11 @@ app = FastAPI(
     openapi_tags=[
         {"name": "Authentication", "description": "User authentication endpoints"},
         {"name": "CV", "description": "CV management endpoints"},
-        {"name": "Applications", "description": "Job application tracker endpoints"},
-        {"name": "Score", "description": "AI CV scoring endpoints"},
+        {"name": "Profile", "description": "User profile endpoints"},
     ]
 )
 
-Base.metadata.create_all(bind=engine)
+Base.metadata.create_all(bind=engine, checkfirst=True)
 
 app.add_middleware(
     CORSMiddleware,
@@ -42,8 +40,6 @@ app.include_router(auth.router, prefix=settings.API_V1_STR)
 app.include_router(cv.router, prefix=settings.API_V1_STR)
 app.include_router(profile.router, prefix=settings.API_V1_STR)
 app.include_router(upload.router, prefix=settings.API_V1_STR)
-app.include_router(application.router, prefix=settings.API_V1_STR)
-app.include_router(score.router, prefix=settings.API_V1_STR)
 
 @app.get("/")
 async def root():

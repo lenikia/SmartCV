@@ -13,6 +13,6 @@ class User(Base):
     is_active = Column(Boolean, default=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
 
-    # Relationship with CVs
+    # Relationships
     cvs = relationship("CV", back_populates="user", cascade="all, delete-orphan")
-    applications = relationship("Application", back_populates="user", cascade="all, delete-orphan")
+    profile = relationship("UserProfile", back_populates="user", uselist=False)
