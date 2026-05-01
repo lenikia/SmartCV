@@ -4,6 +4,7 @@ from fastapi.security import OAuth2PasswordBearer
 from app.core.config import settings
 from app.routers import auth, cv, profile, upload
 from app.database import engine, Base
+from app.routers import auth, cv, profile, upload, ai
 
 # Model imports — required for create_all to know about all tables
 from app.models import user, cv as cv_model, profile as profile_model
@@ -40,6 +41,7 @@ app.include_router(auth.router, prefix=settings.API_V1_STR)
 app.include_router(cv.router, prefix=settings.API_V1_STR)
 app.include_router(profile.router, prefix=settings.API_V1_STR)
 app.include_router(upload.router, prefix=settings.API_V1_STR)
+app.include_router(ai.router, prefix=settings.API_V1_STR)
 
 @app.get("/")
 async def root():
