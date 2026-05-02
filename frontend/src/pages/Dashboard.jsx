@@ -1,11 +1,31 @@
 import { Link, useNavigate } from "react-router-dom";
 import { useEffect, useState } from "react";
 import { getProfile } from "../api/profile";
+import { getCVs, deleteCV, createCV, generateCVFromUrl } from "../api/cv";
 
 function Dashboard() {
     const navigate = useNavigate();
-    const [user, setUser] = useState(null);  // ← this line was missing
 
+    // ── State ─────────────────────────────────────────────
+    const [user, setUser] = useState(null);
+    const [activeTab, setActiveTab] = useState("cvs");
+
+    // CV tab state
+    const [cvs, setCVs] = useState([]);
+    const [cvsLoading, setCvsLoading] = useState(true);
+    const [cvsError, setCvsError] = useState("");
+    const [deleteConfirm, setDeleteConfirm] = useState(null); // cv_id to confirm delete
+
+    // Template picker modal state
+    const [showTemplatePicker, setShowTemplatePicker] = useState(false);
+    const [selectedTemplate, setSelectedTemplate] = useState("minimal");
+
+    // Quick CV state
+    const [jobUrl, setJobUrl] = useState("");
+    const [quickCVLoading, setQuickCVLoading] = useState(false);
+    const [quickCVError, setQuickCVError] = useState("");
+
+    // ── Auth + profile guard ───────────────────────────────
     useEffect(() => {
         const token = localStorage.getItem("token");
 
@@ -14,24 +34,142 @@ function Dashboard() {
             return;
         }
 
-        getProfile().then(profile => {
-            if (!profile) {
-                navigate("/");
-            } else {
-                setUser(profile);
-            }
-        }).catch(() => {
-            localStorage.removeItem("token");
-            navigate("/signin");
-        });
+        getProfile()
+            .then(profile => {
+                if (!profile) {
+                    navigate("/");
+                } else {
+                    setUser(profile);
+                }
+            })
+            .catch(() => {
+                localStorage.removeItem("token");
+                navigate("/signin");
+            });
     }, [navigate]);
 
-    const mockResumes = [
-        { id: 1, title: "Software Engineer Resume", lastUpdated: "2 days ago", score: 82, status: "Strong" },
-        { id: 2, title: "Data Analyst Resume", lastUpdated: "5 days ago", score: 74, status: "Needs Improvement" },
-        { id: 3, title: "Machine Learning Resume", lastUpdated: "1 week ago", score: 89, status: "Excellent" },
-    ];
+    // ── Fetch CVs when user is loaded ─────────────────────
+    useEffect(() => {
+        if (!user) return;
 
+        setCvsLoading(true);
+        getCVs()
+            .then(data => setCVs(data))
+            .catch(err => setCvsError(err.message))
+            .finally(() => setCvsLoading(false));
+    }, [user]);
+
+    // ── Handlers ──────────────────────────────────────────
+    const handleDelete = async (cvId) => {
+        try {
+            await deleteCV(cvId);
+            // Remove from local state — no need to refetch
+            setCVs(prev => prev.filter(cv => cv.id !== cvId));
+            setDeleteConfirm(null);
+        } catch (err) {
+            setCvsError(err.message);
+        }
+    };
+
+    const handleCreateCV = async () => {
+    console.log("Create CV clicked, user:", user);
+    
+    if (!user) {
+        setCvsError("Profile not loaded.");
+        setShowTemplatePicker(false);
+        return;
+    }
+
+    setShowTemplatePicker(false);
+    try {
+        const newCV = await createCV({
+            title: "Untitled CV",
+            template: selectedTemplate,
+            personal_info: {
+                full_name: `${user.first_name} ${user.last_name}`,
+                email: user.email,
+                phone: user.phone || "",
+                professional_title: user.preferred_job_title || ""
+            },
+            summary: "",
+            education: {},
+            skills: [],
+            experience: [],
+            projects: []
+        });
+
+        console.log("CV created:", newCV); // ← add this
+        navigate(`/cv-builder?id=${newCV.id}`);
+    } catch (err) {
+        console.log("CV creation error:", err.message); // ← add this
+        setCvsError(err.message);
+    }
+};
+
+    const handleQuickCV = async () => {
+        if (!jobUrl.trim()) {
+            setQuickCVError("Please paste a job posting URL.");
+            return;
+        }
+
+        if (!jobUrl.startsWith("http")) {
+            setQuickCVError("Please enter a valid URL starting with http or https.");
+            return;
+        }
+
+        setQuickCVError("");
+        setQuickCVLoading(true);
+
+        try {
+            const result = await generateCVFromUrl(jobUrl, {});
+
+            // Create a new CV with the AI-generated content
+            const newCV = await createCV({
+                title: "Quick CV — AI Generated",
+                template: "minimal",
+                personal_Info: {
+                    fullName: `${user.first_name} ${user.last_name}`,
+                    email: user.email,
+                    phone: user.phone || "",
+                    professional_Title: user.preferred_job_title || ""
+                },
+                summary: result.enhanced_sections?.profile || "",
+                skills: result.enhanced_sections?.skills
+                    ? result.enhanced_sections.skills.split(",").map(s => s.trim())
+                    : [],
+                experience: [],
+                projects: [],
+                education: {}
+            });
+
+            // Add to local state
+            setCVs(prev => [newCV, ...prev]);
+            setJobUrl("");
+
+            // Navigate to builder to let user edit
+            navigate(`/cv-builder?id=${newCV.id}`);
+        } catch (err) {
+            setQuickCVError(err.message);
+        } finally {
+            setQuickCVLoading(false);
+        }
+    };
+
+    const formatDate = (dateString) => {
+        if (!dateString) return "Never updated";
+        const date = new Date(dateString);
+        const now = new Date();
+        const diffMs = now - date;
+        const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+
+        if (diffDays === 0) return "Today";
+        if (diffDays === 1) return "Yesterday";
+        if (diffDays < 7) return `${diffDays} days ago`;
+        if (diffDays < 30) return `${Math.floor(diffDays / 7)} weeks ago`;
+        return date.toLocaleDateString();
+    };
+
+    // ── Render ────────────────────────────────────────────
     return (
         <div className="dashboard-page">
             <header className="dashboard-topbar">
@@ -58,150 +196,240 @@ function Dashboard() {
 
             <main className="dashboard-main">
                 <div className="container">
+
+                    {/* ── Hero ── */}
                     <section className="dashboard-hero">
                         <div>
                             <span className="eyebrow">Dashboard</span>
                             <h1>Welcome back, {user?.first_name || "..."}</h1>
-                            <p>
-                                Manage your resumes, track ATS performance, and continue
-                                improving your job application materials.
-                            </p>
-                        </div>
-
-                        <div className="dashboard-hero-actions">
-                            <Link to="/cv-builder" className="primary-btn nav-link-btn">
-                                Create New Resume
-                            </Link>
-                            <Link to="/resume-checker" className="secondary-btn nav-link-btn">
-                                Run ATS Check
-                            </Link>
+                            <p>Manage your CVs, track applications, and generate tailored resumes.</p>
                         </div>
                     </section>
 
-                    <section className="dashboard-stats">
-                        <div className="dashboard-stat-card">
-                            <p>Total Resumes</p>
-                            <h3>3</h3>
-                            <span>Across multiple target roles</span>
-                        </div>
-                        <div className="dashboard-stat-card">
-                            <p>Average ATS Score</p>
-                            <h3>81%</h3>
-                            <span>Good overall resume quality</span>
-                        </div>
-                        <div className="dashboard-stat-card">
-                            <p>Suggested Improvements</p>
-                            <h3>12</h3>
-                            <span>Across summaries, keywords, and structure</span>
-                        </div>
-                        <div className="dashboard-stat-card">
-                            <p>Job Match Ready</p>
-                            <h3>2</h3>
-                            <span>Resumes ready for role targeting</span>
-                        </div>
-                    </section>
+                    {/* ── Tabs ── */}
+                    <div className="dashboard-tabs">
+                        <button
+                            className={`dashboard-tab ${activeTab === "cvs" ? "active" : ""}`}
+                            onClick={() => setActiveTab("cvs")}
+                        >
+                            My CVs
+                        </button>
+                        <button
+                            className={`dashboard-tab ${activeTab === "jobs" ? "active" : ""}`}
+                            onClick={() => setActiveTab("jobs")}
+                        >
+                            Job Tracker
+                        </button>
+                    </div>
 
-                    <section className="dashboard-grid">
-                        <div className="dashboard-panel large-panel">
-                            <div className="dashboard-panel-header">
-                                <div>
-                                    <h2>My Resumes</h2>
-                                    <p>Track your current resume versions and their performance.</p>
-                                </div>
-                                <button className="ghost-btn">View All</button>
-                            </div>
+                    {/* ── CVs Tab ── */}
+                    {activeTab === "cvs" && (
+                        <div className="dashboard-cvs-tab">
 
-                            <div className="resume-list">
-                                {mockResumes.map((resume) => (
-                                    <div className="resume-row" key={resume.id}>
-                                        <div className="resume-row-main">
-                                            <h3>{resume.title}</h3>
-                                            <p>Last updated: {resume.lastUpdated}</p>
-                                        </div>
-                                        <div className="resume-row-meta">
-                                            <span className="score-badge">{resume.score}%</span>
-                                            <span className="status-text">{resume.status}</span>
-                                            <button className="secondary-btn small-btn">Open</button>
-                                        </div>
+                            {/* Quick CV zone */}
+                            <div className="quick-cv-zone">
+                                <div className="quick-cv-header">
+                                    <div>
+                                        <h2>Quick CV</h2>
+                                        <p>
+                                            Paste a job posting URL and SmartCV will generate
+                                            a tailored CV from your profile instantly.
+                                        </p>
                                     </div>
-                                ))}
+                                    <span className="eyebrow">AI Powered</span>
+                                </div>
+
+                                <div className="quick-cv-input-row">
+                                    <input
+                                        type="url"
+                                        placeholder="https://linkedin.com/jobs/view/..."
+                                        value={jobUrl}
+                                        onChange={e => setJobUrl(e.target.value)}
+                                        className="quick-cv-input"
+                                        onKeyDown={e => e.key === "Enter" && handleQuickCV()}
+                                    />
+                                    <button
+                                        className="primary-btn"
+                                        onClick={handleQuickCV}
+                                        disabled={quickCVLoading}
+                                    >
+                                        {quickCVLoading ? "Generating..." : "Generate CV"}
+                                    </button>
+                                </div>
+
+                                {quickCVError && (
+                                    <p className="auth-error">{quickCVError}</p>
+                                )}
+
+                                {quickCVLoading && (
+                                    <p className="quick-cv-loading">
+                                        Fetching job posting and generating your CV...
+                                        this takes about 10 seconds.
+                                    </p>
+                                )}
+                            </div>
+
+                            {/* Create new CV button */}
+                            <div className="cvs-list-header">
+                                <h2>My CVs ({cvs.length})</h2>
+                                <button
+                                    className="primary-btn"
+                                    onClick={() => setShowTemplatePicker(true)}
+                                >
+                                    + Create New CV
+                                </button>
+                            </div>
+
+                            {/* Error */}
+                            {cvsError && <p className="auth-error">{cvsError}</p>}
+
+                            {/* Loading */}
+                            {cvsLoading && (
+                                <p className="cvs-loading">Loading your CVs...</p>
+                            )}
+
+                            {/* Empty state */}
+                            {!cvsLoading && cvs.length === 0 && (
+                                <div className="cvs-empty">
+                                    <p>No CVs yet. Create your first one or use Quick CV above.</p>
+                                </div>
+                            )}
+
+                            {/* CV list */}
+                            {!cvsLoading && cvs.length > 0 && (
+                                <div className="resume-list">
+                                    {cvs.map(cv => (
+                                        <div className="resume-row" key={cv.id}>
+                                            <div className="resume-row-main">
+                                                <h3>{cv.title}</h3>
+                                                <p>
+                                                    Template: {cv.template || "minimal"} ·
+                                                    Last updated: {formatDate(cv.updated_at || cv.created_at)}
+                                                </p>
+                                            </div>
+
+                                            <div className="resume-row-meta">
+                                                <button
+                                                    className="primary-btn small-btn"
+                                                    onClick={() => navigate(`/cv-builder?id=${cv.id}`)}
+                                                >
+                                                    Open
+                                                </button>
+
+                                                {deleteConfirm === cv.id ? (
+                                                    <>
+                                                        <span className="delete-confirm-text">
+                                                            Are you sure?
+                                                        </span>
+                                                        <button
+                                                            className="danger-btn small-btn"
+                                                            onClick={() => handleDelete(cv.id)}
+                                                        >
+                                                            Yes, delete
+                                                        </button>
+                                                        <button
+                                                            className="secondary-btn small-btn"
+                                                            onClick={() => setDeleteConfirm(null)}
+                                                        >
+                                                            Cancel
+                                                        </button>
+                                                    </>
+                                                ) : (
+                                                    <button
+                                                        className="secondary-btn small-btn"
+                                                        onClick={() => setDeleteConfirm(cv.id)}
+                                                    >
+                                                        Delete
+                                                    </button>
+                                                )}
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
+                            )}
+                        </div>
+                    )}
+
+                    {/* ── Jobs Tab ── */}
+                    {activeTab === "jobs" && (
+                        <div className="dashboard-jobs-tab">
+                            <div className="cvs-empty">
+                                <p>Job tracker coming soon — Task 3.</p>
                             </div>
                         </div>
-
-                        <div className="dashboard-panel side-panel">
-                            <div className="dashboard-panel-header">
-                                <div>
-                                    <h2>Quick Actions</h2>
-                                    <p>Move faster through your workflow.</p>
-                                </div>
-                            </div>
-
-                            <div className="quick-actions">
-                                <button className="primary-btn">Create Resume</button>
-                                <Link to="/resume-checker" className="secondary-btn nav-link-btn">
-                                    Check ATS Score
-                                </Link>
-                                <button className="secondary-btn">Match to Job</button>
-                                <button className="secondary-btn">View Suggestions</button>
-                            </div>
-                        </div>
-                    </section>
-
-                    <section className="dashboard-grid lower-grid">
-                        <div className="dashboard-panel">
-                            <div className="dashboard-panel-header">
-                                <div>
-                                    <h2>Recent Suggestions</h2>
-                                    <p>Priority recommendations for improvement.</p>
-                                </div>
-                            </div>
-
-                            <div className="suggestion-list">
-                                <div className="suggestion-item">
-                                    <strong>Improve summary clarity</strong>
-                                    <p>Make your professional summary more role-specific and results-oriented.</p>
-                                </div>
-                                <div className="suggestion-item">
-                                    <strong>Add missing backend keywords</strong>
-                                    <p>Include terms such as REST API, testing, and database design for better alignment.</p>
-                                </div>
-                                <div className="suggestion-item">
-                                    <strong>Strengthen project descriptions</strong>
-                                    <p>Focus more on impact, technologies used, and concrete outcomes.</p>
-                                </div>
-                            </div>
-                        </div>
-
-                        <div className="dashboard-panel">
-                            <div className="dashboard-panel-header">
-                                <div>
-                                    <h2>Application Readiness</h2>
-                                    <p>Current snapshot of your profile quality.</p>
-                                </div>
-                            </div>
-
-                            <div className="readiness-list">
-                                <div className="readiness-row">
-                                    <span>Formatting</span>
-                                    <strong>Strong</strong>
-                                </div>
-                                <div className="readiness-row">
-                                    <span>Keywords</span>
-                                    <strong>Moderate</strong>
-                                </div>
-                                <div className="readiness-row">
-                                    <span>Readability</span>
-                                    <strong>Strong</strong>
-                                </div>
-                                <div className="readiness-row">
-                                    <span>Role Alignment</span>
-                                    <strong>Improving</strong>
-                                </div>
-                            </div>
-                        </div>
-                    </section>
+                    )}
                 </div>
             </main>
+
+            {/* ── Template picker modal ── */}
+            {showTemplatePicker && (
+                <div className="modal-overlay" onClick={() => setShowTemplatePicker(false)}>
+                    {console.log("Modal rendering, showTemplatePicker:", showTemplatePicker)}
+                    <div className="modal" onClick={e => e.stopPropagation()}>
+                        <div className="modal-header">
+                            <h2>Choose a template</h2>
+                            <button
+                                className="modal-close"
+                                onClick={() => setShowTemplatePicker(false)}
+                            >
+                                ✕
+                            </button>
+                        </div>
+
+                        <div className="template-grid">
+                            {[
+                                {
+                                    id: "minimal",
+                                    name: "Minimal",
+                                    description: "Clean single column, lots of whitespace"
+                                },
+                                {
+                                    id: "modern",
+                                    name: "Modern",
+                                    description: "Sidebar layout with accent colours"
+                                },
+                                {
+                                    id: "classic",
+                                    name: "Classic",
+                                    description: "Traditional professional layout"
+                                }
+                            ].map(template => (
+                                <div
+                                    key={template.id}
+                                    className={`template-card ${selectedTemplate === template.id ? "selected" : ""}`}
+                                    onClick={() => setSelectedTemplate(template.id)}
+                                >
+                                    <div className="template-preview">
+                                        <div className="template-preview-lines">
+                                            <div className="tpl-line tpl-line-title" />
+                                            <div className="tpl-line tpl-line-sub" />
+                                            <div className="tpl-line" />
+                                            <div className="tpl-line tpl-line-short" />
+                                        </div>
+                                    </div>
+                                    <h3>{template.name}</h3>
+                                    <p>{template.description}</p>
+                                </div>
+                            ))}
+                        </div>
+
+                        <div className="modal-footer">
+                            <button
+                                className="secondary-btn"
+                                onClick={() => setShowTemplatePicker(false)}
+                            >
+                                Cancel
+                            </button>
+                            <button
+                                className="primary-btn"
+                                onClick={handleCreateCV}
+                            >
+                                Create CV
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     );
 }
