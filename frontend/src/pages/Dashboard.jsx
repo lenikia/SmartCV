@@ -150,53 +150,166 @@ function Dashboard() {
 };
 
     const handleQuickCV = async () => {
-        if (!jobUrl.trim()) {
-            setQuickCVError("Please paste a job posting URL.");
-            return;
-        }
+    if (!jobUrl.trim()) {
+        setQuickCVError("Please paste a job posting URL.");
+        return;
+    }
 
-        if (!jobUrl.startsWith("http")) {
-            setQuickCVError("Please enter a valid URL starting with http or https.");
-            return;
-        }
+    if (!jobUrl.startsWith("http")) {
+        setQuickCVError("Please enter a valid URL starting with http or https.");
+        return;
+    }
 
-        setQuickCVError("");
-        setQuickCVLoading(true);
+    setQuickCVError("");
+    setQuickCVLoading(true);
 
-        try {
-            const result = await generateCVFromUrl(jobUrl, {});
+    try {
+        // Generate tailored content from job URL
+        const result = await generateCVFromUrl(jobUrl, {});
+        const ai = result.enhanced_sections;
 
-            // Create a new CV with the AI-generated content
-            const newCV = await createCV({
-                title: "Quick CV — AI Generated",
-                template: "minimal",
-                personal_Info: {
-                    fullName: `${user.first_name} ${user.last_name}`,
-                    email: user.email,
-                    phone: user.phone || "",
-                    professional_Title: user.preferred_job_title || ""
-                },
-                summary: result.enhanced_sections?.profile || "",
-                skills: result.enhanced_sections?.skills
-                    ? result.enhanced_sections.skills.split(",").map(s => s.trim())
-                    : [],
-                experience: [],
-                projects: [],
-                education: {}
-            });
-
-            // Add to local state
-            setCVs(prev => [newCV, ...prev]);
-            setJobUrl("");
-
-            // Navigate to builder to let user edit
-            navigate(`/cv-builder?id=${newCV.id}`);
-        } catch (err) {
-            setQuickCVError(err.message);
-        } finally {
+        if (ai.error) {
+            setQuickCVError("AI could not parse the job posting. Try a different URL.");
             setQuickCVLoading(false);
+            return;
         }
-    };
+
+        // Create the CV shell
+        const newCV = await createCV({
+            title: `Quick CV — ${new Date().toLocaleDateString()}`,
+            template: "minimal",
+            personal_info: {
+                full_name: `${user.first_name} ${user.last_name}`,
+                email: user.email,
+                phone: user.phone || "",
+                professional_title: user.preferred_job_title || "",
+                location: user.address
+                    ? `${user.address}, ${user.country}`
+                    : user.country || "",
+                linkedin: "",
+                github: ""
+            },
+            summary: ai.about_me || "",
+            education: {},
+            skills: [],
+            experience: [],
+            projects: []
+        });
+
+        // Build sections from AI response — matching Template 1 structure
+        const sectionsToCreate = [
+            {
+                name: "About Me",
+                type: "text",
+                content: { value: ai.about_me || "" },
+                order_index: 0
+            },
+            {
+                name: "Skills",
+                type: "subsections",
+                content: {
+                    entries: [
+                        {
+                            title: "Programming Languages",
+                            subtitle: "", date: "",
+                            bullets: ai.skills?.programming || []
+                        },
+                        {
+                            title: "Tools & Platforms",
+                            subtitle: "", date: "",
+                            bullets: ai.skills?.tools || []
+                        },
+                        ...(ai.skills?.other?.length ? [{
+                            title: "Other",
+                            subtitle: "", date: "",
+                            bullets: ai.skills.other
+                        }] : [])
+                    ]
+                },
+                order_index: 1
+            },
+            {
+                name: "Experience",
+                type: "subsections",
+                content: {
+                    entries: (ai.experience || []).map(e => ({
+                        title: e.title || e.role || "",
+                        subtitle: e.subtitle || e.company || "",
+                        date: e.date || "",
+                        bullets: e.bullets || []
+                    }))
+                },
+                order_index: 2
+            },
+            {
+                name: "Soft Skills",
+                type: "bullets",
+                content: { items: ai.soft_skills || [] },
+                order_index: 3
+            },
+            {
+                name: "University Projects",
+                type: "subsections",
+                content: {
+                    entries: (ai.university_projects || []).map(p => ({
+                        title: p.title || p.name || "",
+                        subtitle: p.subtitle || p.duration || "",
+                        date: p.date || "",
+                        bullets: p.bullets || []
+                    }))
+                },
+                order_index: 4
+            },
+            {
+                name: "Personal Projects",
+                type: "subsections",
+                content: {
+                    entries: (ai.personal_projects || []).map(p => ({
+                        title: p.title || p.name || "",
+                        subtitle: p.subtitle || p.duration || "",
+                        date: p.date || "",
+                        bullets: p.bullets || []
+                    }))
+                },
+                order_index: 5
+            },
+            {
+                name: "Interests",
+                type: "bullets",
+                content: { items: ai.interests || [] },
+                order_index: 6
+            },
+            {
+                name: "Education",
+                type: "subsections",
+                content: {
+                    entries: (ai.education || []).map(e => ({
+                        title: e.title || e.institution || "",
+                        subtitle: e.subtitle || e.degree || "",
+                        date: e.date || e.year || "",
+                        bullets: e.bullets || []
+                    }))
+                },
+                order_index: 7
+            }
+        ];
+
+        // Create all sections in parallel
+        await Promise.all(
+            sectionsToCreate.map(section => createSection(newCV.id, section))
+        );
+
+        // Add to local CV list and navigate to builder
+        setCVs(prev => [newCV, ...prev]);
+        setJobUrl("");
+        navigate(`/cv-builder?id=${newCV.id}`);
+
+    } catch (err) {
+        setQuickCVError(err.message);
+    } finally {
+        setQuickCVLoading(false);
+    }
+};
 
     const formatDate = (dateString) => {
         if (!dateString) return "Never updated";

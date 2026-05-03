@@ -102,27 +102,12 @@ async def generate_from_job_url(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
-    """
-    Fetch a job posting URL and generate a complete tailored CV.
-
-    This endpoint is async because fetching the URL uses httpx
-    async client — we don't want to block the server while
-    waiting for the external HTTP request to complete.
-
-    The user's profile is pulled from the DB here so the AI
-    has full context about the candidate without the frontend
-    needing to send it all manually.
-    """
-
-    # Validate URL format minimally
     if not request.job_url.startswith("http"):
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
             detail="job_url must be a valid URL starting with http or https"
         )
 
-    # Pull the user's profile from DB
-    # The AI needs this to generate personalised content
     profile = db.query(UserProfile).filter(
         UserProfile.user_id == current_user.id
     ).first()
@@ -133,14 +118,25 @@ async def generate_from_job_url(
             detail="Complete your profile before generating from a job URL"
         )
 
-    # Convert profile ORM object to dict for the service layer
+    # Pass the FULL profile — all master data
     profile_dict = {
         "first_name": profile.first_name,
         "last_name": profile.last_name,
         "email": profile.email,
         "phone": profile.phone,
+        "address": profile.address,
         "country": profile.country,
-        "preferred_job_title": profile.preferred_job_title
+        "preferred_job_title": profile.preferred_job_title,
+        "brief_intro": profile.brief_intro,
+        "about_me": profile.about_me,
+        "skills": profile.skills,
+        "experience": profile.experience,
+        "university_projects": profile.university_projects,
+        "personal_projects": profile.personal_projects,
+        "soft_skills": profile.soft_skills,
+        "interests": profile.interests,
+        "education": profile.education,
+        "languages": profile.languages,
     }
 
     try:
@@ -149,9 +145,7 @@ async def generate_from_job_url(
             profile=profile_dict,
             sections=request.sections
         )
-
         return GenerateFromUrlResponse(enhanced_sections=enhanced_sections)
-
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
