@@ -2,6 +2,7 @@ import { Link, useNavigate } from "react-router-dom";
 import { useEffect, useState } from "react";
 import { getProfile } from "../api/profile";
 import { getCVs, deleteCV, createCV, generateCVFromUrl } from "../api/cv";
+import { createSection } from "../api/cv_sections";
 
 function Dashboard() {
     const navigate = useNavigate();
@@ -73,14 +74,46 @@ function Dashboard() {
 
     const handleCreateCV = async () => {
     console.log("Create CV clicked, user:", user);
-    
+
     if (!user) {
         setCvsError("Profile not loaded.");
         setShowTemplatePicker(false);
         return;
     }
 
+    // Define sections BEFORE the try block so they're in scope
+    const template1Sections = [
+        { name: "About Me", type: "text", content: { value: "" }, order_index: 0 },
+        { name: "Skills", type: "subsections", content: { entries: [
+            { title: "Programming Languages", subtitle: "", date: "", bullets: [""] },
+            { title: "Libraries & Frameworks", subtitle: "", date: "", bullets: [""] },
+            { title: "Tools & Platforms", subtitle: "", date: "", bullets: [""] },
+        ]}, order_index: 1 },
+        { name: "Experience", type: "subsections", content: { entries: [] }, order_index: 2 },
+        { name: "Soft Skills", type: "bullets", content: { items: [] }, order_index: 3 },
+        { name: "Personal Projects", type: "subsections", content: { entries: [] }, order_index: 4 },
+        { name: "Other Experience", type: "subsections", content: { entries: [] }, order_index: 5 },
+        { name: "Interests", type: "bullets", content: { items: [] }, order_index: 6 },
+        { name: "Education", type: "subsections", content: { entries: [] }, order_index: 7 },
+    ];
+
+    const template2Sections = [
+        { name: "Experience", type: "subsections", content: { entries: [] }, order_index: 0 },
+        { name: "Personal Projects", type: "subsections", content: { entries: [] }, order_index: 1 },
+        { name: "Skills", type: "subsections", content: { entries: [
+            { title: "Technical", subtitle: "", date: "", bullets: [""] },
+            { title: "Soft", subtitle: "", date: "", bullets: [""] },
+        ]}, order_index: 2 },
+        { name: "Education", type: "subsections", content: { entries: [] }, order_index: 3 },
+        { name: "About Me", type: "text", content: { value: "" }, order_index: 4 },
+    ];
+
+    const defaultSections = selectedTemplate === "modern"
+        ? template2Sections
+        : template1Sections;
+
     setShowTemplatePicker(false);
+
     try {
         const newCV = await createCV({
             title: "Untitled CV",
@@ -89,7 +122,10 @@ function Dashboard() {
                 full_name: `${user.first_name} ${user.last_name}`,
                 email: user.email,
                 phone: user.phone || "",
-                professional_title: user.preferred_job_title || ""
+                professional_title: user.preferred_job_title || "",
+                location: user.address
+                    ? `${user.address}, ${user.country}`
+                    : user.country || ""
             },
             summary: "",
             education: {},
@@ -98,10 +134,17 @@ function Dashboard() {
             projects: []
         });
 
-        console.log("CV created:", newCV); // ← add this
+        console.log("CV created:", newCV);
+        console.log("Creating sections:", defaultSections.length);
+
+        await Promise.all(
+            defaultSections.map(section => createSection(newCV.id, section))
+        );
+
+        console.log("Sections created successfully");
         navigate(`/cv-builder?id=${newCV.id}`);
     } catch (err) {
-        console.log("CV creation error:", err.message); // ← add this
+        console.log("Error:", err.message);
         setCvsError(err.message);
     }
 };

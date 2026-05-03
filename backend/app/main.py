@@ -1,7 +1,9 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.security import OAuth2PasswordBearer
+from app.routers import auth, cv, profile, upload, ai, cv_sections
 from app.core.config import settings
+from app.models import cv_section as cv_section_model 
 from app.routers import auth, cv, profile, upload
 from app.database import engine, Base
 from app.routers import auth, cv, profile, upload, ai
@@ -42,6 +44,7 @@ app.include_router(cv.router, prefix=settings.API_V1_STR)
 app.include_router(profile.router, prefix=settings.API_V1_STR)
 app.include_router(upload.router, prefix=settings.API_V1_STR)
 app.include_router(ai.router, prefix=settings.API_V1_STR)
+app.include_router(cv_sections.router, prefix=settings.API_V1_STR)
 
 @app.get("/")
 async def root():
