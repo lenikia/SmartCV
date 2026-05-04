@@ -166,7 +166,9 @@ function Dashboard() {
     try {
         // Generate tailored content from job URL
         const result = await generateCVFromUrl(jobUrl, {});
+        console.log("AI result:", JSON.stringify(result, null, 2));
         const ai = result.enhanced_sections;
+        console.log("AI enhanced sections:", JSON.stringify(ai, null, 2));
 
         if (ai.error) {
             setQuickCVError("AI could not parse the job posting. Try a different URL.");
@@ -337,6 +339,7 @@ function Dashboard() {
 
                     <div className="dashboard-topbar-actions">
                         <Link to="/" className="ghost-btn nav-link-btn">Home</Link>
+                        <Link to="/profile" className="ghost-btn nav-link-btn">My Profile</Link>
                         <button
                             className="secondary-btn"
                             onClick={() => {

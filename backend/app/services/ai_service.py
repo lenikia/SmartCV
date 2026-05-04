@@ -204,17 +204,11 @@ def generate_section(
 
 
 async def generate_from_url(job_url: str, profile: dict, sections: dict) -> dict:
-    """
-    Fetch a job posting URL, parse it, and generate a complete
-    tailored CV for every section based on the user's profile.
-
-    Returns a dict of section_name -> ai_generated_content.
-    This is Task 4 — we implement the URL fetching here
-    but wire it to the router in the next step.
-    """
     import httpx
+    import json
 
     # Fetch the job posting page
+    job_page_text = ""
     async with httpx.AsyncClient() as http_client:
         try:
             response = await http_client.get(
@@ -223,46 +217,116 @@ async def generate_from_url(job_url: str, profile: dict, sections: dict) -> dict
                 follow_redirects=True,
                 headers={"User-Agent": "Mozilla/5.0"}
             )
-            job_page_text = response.text
+            job_page_text = response.text[:4000]
         except Exception:
-            job_page_text = ""
+            job_page_text = "Could not fetch job posting."
 
-    # Build a combined prompt with the full profile and job page
-    # We ask Claude to generate all sections in one call for efficiency
-    combined_prompt = f"""
-You are a professional CV writer. Based on the candidate profile below
-and the job posting provided, generate tailored content for each CV section.
-
+    profile_context = f"""
 CANDIDATE PROFILE:
 Name: {profile.get('first_name')} {profile.get('last_name')}
 Email: {profile.get('email')}
 Phone: {profile.get('phone', 'Not provided')}
+Location: {profile.get('address', '')} {profile.get('country', '')}
 Preferred Job Title: {profile.get('preferred_job_title', 'Not provided')}
 
-EXISTING CV SECTIONS:
-{sections}
+BRIEF INTRO: {profile.get('brief_intro', 'Not provided')}
+
+ABOUT ME (candidate own words):
+{profile.get('about_me', 'Not provided')}
+
+SKILLS: {json.dumps(profile.get('skills', {}), indent=2)}
+
+EXPERIENCE: {json.dumps(profile.get('experience', []), indent=2)}
+
+UNIVERSITY PROJECTS: {json.dumps(profile.get('university_projects', []), indent=2)}
+
+PERSONAL PROJECTS: {json.dumps(profile.get('personal_projects', []), indent=2)}
+
+SOFT SKILLS: {json.dumps(profile.get('soft_skills', []), indent=2)}
+
+INTERESTS: {json.dumps(profile.get('interests', []), indent=2)}
+
+EDUCATION: {json.dumps(profile.get('education', []), indent=2)}
+
+LANGUAGES: {json.dumps(profile.get('languages', []), indent=2)}
+"""
+
+    prompt = f"""You are a professional CV writer. Using ONLY the candidate profile data below,
+generate a complete tailored CV for the job posting provided.
+
+RULES:
+1. Use ONLY facts from the candidate profile — never invent experience or skills
+2. If a section has no profile data, return empty array or empty string
+3. Tailor language and emphasis to match job description keywords
+4. Write achievement-focused bullet points with strong action verbs
+5. Return ONLY valid JSON — no markdown fences, no explanation, no extra text
+
+{profile_context}
 
 JOB POSTING:
-{job_page_text[:3000]}
+{job_page_text}
 
-Generate tailored content for each section. Return as JSON with section
-names as keys and enhanced content as values. Only include sections
-that exist in the candidate's profile. Do not invent information.
-"""
+Return ONLY this exact JSON structure:
+{{
+  "brief_intro": "one-liner tailored to this role",
+  "about_me": "polished profile paragraph preserving candidate voice with job keywords",
+  "skills": {{
+    "programming": ["languages ranked by job relevance"],
+    "tools": ["tools ranked by job relevance"],
+    "other": ["other relevant skills"]
+  }},
+  "experience": [
+    {{
+      "title": "role title",
+      "subtitle": "company",
+      "date": "date range",
+      "bullets": ["achievement 1", "achievement 2"]
+    }}
+  ],
+  "university_projects": [
+    {{
+      "title": "project name",
+      "subtitle": "duration",
+      "date": "",
+      "bullets": ["what was built", "tech used", "outcome"]
+    }}
+  ],
+  "personal_projects": [
+    {{
+      "title": "project name",
+      "subtitle": "duration",
+      "date": "",
+      "bullets": ["what was built", "tech used"]
+    }}
+  ],
+  "soft_skills": ["skill 1", "skill 2"],
+  "interests": ["interest 1", "interest 2"],
+  "education": [
+    {{
+      "title": "institution",
+      "subtitle": "degree",
+      "date": "year/status",
+      "bullets": ["field of study"]
+    }}
+  ]
+}}"""
 
     message = client.messages.create(
         model="claude-sonnet-4-6",
         max_tokens=4000,
-        messages=[{"role": "user", "content": combined_prompt}]
+        messages=[{"role": "user", "content": prompt}]
     )
 
-    # Parse the JSON response
-    import json
-    try:
-        result = json.loads(message.content[0].text)
-    except json.JSONDecodeError:
-        # If Claude didn't return clean JSON, return the raw text
-        # under a special key so the frontend can handle it
-        result = {"raw": message.content[0].text}
+    raw = message.content[0].text.strip()
 
-    return result
+    # Strip markdown fences if Claude wrapped the response
+    if raw.startswith("```"):
+        raw = raw.split("```")[1]
+        if raw.startswith("json"):
+            raw = raw[4:]
+        raw = raw.strip()
+
+    try:
+        return json.loads(raw)
+    except json.JSONDecodeError:
+        return {"raw": raw, "error": "Could not parse AI response"}

@@ -430,6 +430,7 @@ function CVBuilder() {
                     </Link>
                     <div className="dashboard-topbar-actions">
                         <Link to="/dashboard" className="ghost-btn nav-link-btn">Dashboard</Link>
+                        <Link to="/profile" className="ghost-btn nav-link-btn">My Profile</Link>
                         {saveSuccess && (
                             <span style={{ color: "#166534", fontWeight: 600, fontSize: "0.92rem" }}>✓ Saved</span>
                         )}
