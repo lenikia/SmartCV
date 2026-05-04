@@ -7,6 +7,13 @@ from app.models.cv import CV
 from app.models.user import User
 from app.schemas.cv import CVCreate, CVResponse
 from app.utils.dependencies import get_current_user
+from fastapi.responses import StreamingResponse
+from reportlab.lib.pagesizes import A4
+from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+from reportlab.lib.units import cm
+from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, HRFlowable
+from reportlab.lib import colors
+import io
 
 router = APIRouter(prefix="/cv", tags=["CV"])
 
@@ -119,20 +126,84 @@ def delete_cv(
     return {"message": "CV deleted successfully"}
 
 
-@router.get("/{cv_id}/export", response_model=CVResponse)
+@router.get("/{cv_id}/export")
 def export_cv(
     cv_id: int,
+    format: str = "pdf",
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
-    cv = db.query(CV).filter(
-        CV.id == cv_id,
-        CV.user_id == current_user.id
-    ).first()
-
+    cv = db.query(CV).filter(CV.id == cv_id, CV.user_id == current_user.id).first()
     if not cv:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="CV not found"
-        )
-    return cv
+        raise HTTPException(status_code=404, detail="CV not found")
+
+    if format != "pdf":
+        raise HTTPException(status_code=400, detail="Only 'pdf' format is supported currently")
+
+    buffer = io.BytesIO()
+    doc = SimpleDocTemplate(
+        buffer, pagesize=A4,
+        rightMargin=2*cm, leftMargin=2*cm,
+        topMargin=2*cm, bottomMargin=2*cm
+    )
+
+    styles = getSampleStyleSheet()
+    name_style = ParagraphStyle("Name", fontSize=20, fontName="Helvetica-Bold", spaceAfter=4)
+    title_style = ParagraphStyle("Title", fontSize=12, textColor=colors.HexColor("#555555"), spaceAfter=2)
+    section_style = ParagraphStyle("Section", fontSize=12, fontName="Helvetica-Bold", spaceBefore=12, spaceAfter=4, textColor=colors.HexColor("#1a1a2e"))
+    body_style = styles["Normal"]
+
+    story = []
+    info = cv.personal_info or {}
+
+    # Header
+    story.append(Paragraph(info.get("fullName", ""), name_style))
+    if info.get("professionalTitle"):
+        story.append(Paragraph(info["professionalTitle"], title_style))
+
+    contact_parts = [p for p in [info.get("email"), info.get("phone"), info.get("location")] if p]
+    if contact_parts:
+        story.append(Paragraph(" · ".join(contact_parts), body_style))
+
+    story.append(HRFlowable(width="100%", thickness=1, color=colors.HexColor("#1a1a2e"), spaceAfter=8))
+
+    # Summary
+    if cv.summary:
+        story.append(Paragraph("PROFILE", section_style))
+        story.append(Paragraph(cv.summary, body_style))
+
+    # Experience
+    if cv.experience:
+        story.append(Paragraph("EXPERIENCE", section_style))
+        for exp in cv.experience:
+            story.append(Paragraph(f"<b>{exp.get('position', '')}</b> — {exp.get('company', '')}", body_style))
+            date_range = f"{exp.get('startDate', '')} – {exp.get('endDate', 'Present')}"
+            story.append(Paragraph(date_range, ParagraphStyle("Date", fontSize=9, textColor=colors.grey)))
+            if exp.get("description"):
+                story.append(Paragraph(exp["description"], body_style))
+            story.append(Spacer(1, 6))
+
+    # Education
+    if cv.education:
+        story.append(Paragraph("EDUCATION", section_style))
+        ed = cv.education if isinstance(cv.education, dict) else {}
+        line = f"<b>{ed.get('degree', '')}</b> — {ed.get('institution', '')}"
+        story.append(Paragraph(line, body_style))
+        if ed.get("graduationYear"):
+            story.append(Paragraph(str(ed["graduationYear"]), body_style))
+        story.append(Spacer(1, 6))
+
+    # Skills
+    if cv.skills:
+        story.append(Paragraph("SKILLS", section_style))
+        story.append(Paragraph(", ".join(cv.skills), body_style))
+
+    doc.build(story)
+    buffer.seek(0)
+
+    filename = f"cv_{cv.title.replace(' ', '_') if cv.title else cv_id}.pdf"
+    return StreamingResponse(
+        buffer,
+        media_type="application/pdf",
+        headers={"Content-Disposition": f"attachment; filename={filename}"}
+    )

@@ -1,4 +1,4 @@
-import { useMemo, useState, useEffect, useCallback } from "react";
+import {  useState, useEffect, useCallback } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { getCV, updateCV } from "../api/cv";
 import { getSections, createSection, updateSection, deleteSection } from "../api/cv_sections";
@@ -309,6 +309,35 @@ function CVBuilder() {
     // Which section is expanded in the editor
     const [expandedSection, setExpandedSection] = useState(null);
 
+    // ── Export PDF Handler (move this BEFORE the useEffect that uses it)
+    const handleExportPDF = async () => {
+        const token = localStorage.getItem("token");
+        if (!cvId) {
+            alert("Please save your CV first before exporting.");
+            return;
+        }
+
+        try {
+            const response = await fetch(
+                `${import.meta.env.VITE_API_URL || "http://localhost:8000"}/api/v1/cv/${cvId}/export?format=pdf`,
+                { headers: { Authorization: `Bearer ${token}` } }
+            );
+
+            if (!response.ok) throw new Error("Export failed");
+
+            const blob = await response.blob();
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement("a");
+            a.href = url;
+            a.download = "my-cv.pdf";
+            a.click();
+            URL.revokeObjectURL(url);
+        } catch (err) {
+            console.error("Export error:", err); // Add this for debugging
+            alert("Failed to export PDF. Please try again.");
+        }
+    };
+
     // ── Load CV and sections ───────────────────────────────────
     useEffect(() => {
         const token = localStorage.getItem("token");
@@ -451,7 +480,7 @@ function CVBuilder() {
                             <p>Template: <strong>{cv?.template || "minimal"}</strong></p>
                         </div>
                         <div className="builder-hero-actions">
-                            <button className="secondary-btn">Generate PDF</button>
+                            <button className="secondary-btn" onClick={handleExportPDF}>Generate PDF</button>
                         </div>
                     </section>
 
