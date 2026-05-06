@@ -117,6 +117,23 @@ DELETE /api/v1/cv/{id}
 
 POST   /api/v1/ai/generate
 POST   /api/v1/ai/generate-from-url
+
+GET    /api/v1/cv/{id}/sections
+POST   /api/v1/cv/{id}/sections
+PUT    /api/v1/cv/{id}/sections/{section_id}
+DELETE /api/v1/cv/{id}/sections/{section_id}
+PUT    /api/v1/cv/{id}/sections/reorder
+
+GET    /api/v1/jobs/
+GET    /api/v1/jobs/preferences
+
+GET    /api/v1/applications/
+POST   /api/v1/applications/
+PUT    /api/v1/applications/{id}
+DELETE /api/v1/applications/{id}
+
+POST   /api/v1/score/
+POST   /api/v1/upload/
 ```
 
 ---
@@ -145,6 +162,8 @@ Fill in `backend/.env`:
 SECRET_KEY=any-long-random-string
 DATABASE_URL=sqlite:///./smartcv.db
 ANTHROPIC_API_KEY=your-key-here
+ADZUNA_APP_ID=your_app_id_here
+ADZUNA_APP_KEY=your_app_key_here
 ```
 
 Fill in root `.env`:
