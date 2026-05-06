@@ -42,7 +42,7 @@ class GenerateFromUrlResponse(BaseModel):
 # ── Endpoints ────────────────────────────────────────────────
 
 @router.post("/generate", response_model=GenerateSectionResponse)
-def generate_cv_section(
+async def generate_cv_section(
     request: GenerateSectionRequest,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
@@ -74,7 +74,7 @@ def generate_cv_section(
         )
 
     try:
-        enhanced = generate_section(
+        enhanced = await generate_section(
             section_name=request.section_name,
             content=request.content,
             job_title=request.job_title,

@@ -90,12 +90,12 @@ def update_cv(
         )
 
     cv.title = cv_data.title or cv.title
-    cv.personal_info = cv_data.personalInfo.dict()
+    cv.personal_info = cv_data.personal_info
     cv.summary = cv_data.summary
     cv.education = cv_data.education
     cv.skills = cv_data.skills
-    cv.experience = [exp.dict() for exp in cv_data.experience]
-    cv.projects = [proj.dict() for proj in cv_data.projects]
+    cv.experience = cv_data.experience
+    cv.projects = cv_data.projects
     cv.template = cv_data.template or cv.template
     cv.updated_at = datetime.utcnow()
 

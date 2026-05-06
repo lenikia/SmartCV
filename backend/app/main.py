@@ -1,15 +1,15 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.security import OAuth2PasswordBearer
-from app.routers import auth, cv, profile, upload, ai, cv_sections
+from fastapi.routing import APIRouter
 from app.core.config import settings
-from app.models import cv_section as cv_section_model 
-from app.routers import auth, cv, profile, upload
 from app.database import engine, Base
-from app.routers import auth, cv, profile, upload, ai
+
+# Router imports
+from app.routers import auth, cv, profile, upload, ai, cv_sections, application, jobs
 
 # Model imports — required for create_all to know about all tables
-from app.models import user, cv as cv_model, profile as profile_model
+from app.models import user, cv as cv_model, profile as profile_model, cv_section as cv_section_model
 
 app = FastAPI(
     title=settings.PROJECT_NAME,
@@ -19,6 +19,8 @@ app = FastAPI(
         {"name": "Authentication", "description": "User authentication endpoints"},
         {"name": "CV", "description": "CV management endpoints"},
         {"name": "Profile", "description": "User profile endpoints"},
+        {"name": "Applications", "description": "Job application tracker endpoints"},
+        {"name": "Jobs", "description": "Live job listings endpoints"},
     ]
 )
 
@@ -45,6 +47,9 @@ app.include_router(profile.router, prefix=settings.API_V1_STR)
 app.include_router(upload.router, prefix=settings.API_V1_STR)
 app.include_router(ai.router, prefix=settings.API_V1_STR)
 app.include_router(cv_sections.router, prefix=settings.API_V1_STR)
+app.include_router(application.router, prefix=settings.API_V1_STR)  # was never registered
+app.include_router(jobs.router, prefix=settings.API_V1_STR)          # new jobs dashboard
+
 
 @app.get("/")
 async def root():

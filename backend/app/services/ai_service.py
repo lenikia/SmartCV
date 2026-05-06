@@ -1,15 +1,9 @@
 import anthropic
+import asyncio
+import json
 from app.core.config import settings
 
-# Initialise the Anthropic client once at module level
-# This is intentional — creating a new client per request
-# is wasteful. One client instance handles all requests.
 client = anthropic.Anthropic(api_key=settings.ANTHROPIC_API_KEY)
-
-# ── Prompt templates per section ────────────────────────────
-# Each section gets a tailored system prompt that tells Claude
-# exactly what role it's playing and what output is expected.
-# The user message contains the actual content to enhance.
 
 SECTION_PROMPTS = {
     "profile": {
@@ -137,7 +131,6 @@ Format and highlight these certifications for the job above.
 """
     },
 
-    # Default prompt for any custom section the user names themselves
     "default": {
         "system": """You are a professional CV writer specialising in tech roles.
 Your task is to enhance the provided CV section to be clear,
@@ -160,54 +153,31 @@ Enhance this section for the job above.
 }
 
 
-def generate_section(
+async def generate_section(
     section_name: str,
     content: str,
     job_title: str = None,
     job_description: str = None
 ) -> str:
-    """
-    Generate AI-enhanced content for a single CV section.
-
-    Selects the appropriate prompt template for the section name.
-    Falls back to the default prompt for custom/unknown sections.
-    This is intentional — users can name sections anything they want
-    and the AI will still attempt a sensible enhancement.
-    """
-
-    # Normalise section name — lowercase, strip whitespace
-    # so "Skills", "SKILLS", "skills" all match the same prompt
     section_key = section_name.lower().strip()
-
-    # Select prompt — fall back to default for unknown sections
     prompt_config = SECTION_PROMPTS.get(section_key, SECTION_PROMPTS["default"])
-
-    # Build the user message using the lambda for this section
     user_message = prompt_config["user"](content, job_title, job_description)
 
-    # Make the API call
-    # max_tokens=1000 is sufficient for any single CV section
-    # We use claude-sonnet-4-20250514 — best balance of quality and cost
-    message = client.messages.create(
-        model="claude-sonnet-4-6",
-        max_tokens=1000,
-        system=prompt_config["system"],
-        messages=[
-            {"role": "user", "content": user_message}
-        ]
-    )
+    def _call():
+        message = client.messages.create(
+            model="claude-sonnet-4-6",
+            max_tokens=1000,
+            system=prompt_config["system"],
+            messages=[{"role": "user", "content": user_message}]
+        )
+        return message.content[0].text
 
-    # Extract the text from the response
-    # content[0].text is the standard structure for a non-streaming
-    # single message response from the Anthropic API
-    return message.content[0].text
+    return await asyncio.to_thread(_call)
 
 
 async def generate_from_url(job_url: str, profile: dict, sections: dict) -> dict:
     import httpx
-    import json
 
-    # Fetch the job posting page
     job_page_text = ""
     async with httpx.AsyncClient() as http_client:
         try:
@@ -311,15 +281,17 @@ Return ONLY this exact JSON structure:
   ]
 }}"""
 
-    message = client.messages.create(
-        model="claude-sonnet-4-6",
-        max_tokens=4000,
-        messages=[{"role": "user", "content": prompt}]
-    )
+    def _call():
+        message = client.messages.create(
+            model="claude-sonnet-4-6",
+            max_tokens=4000,
+            messages=[{"role": "user", "content": prompt}]
+        )
+        return message.content[0].text
 
-    raw = message.content[0].text.strip()
+    raw = await asyncio.to_thread(_call)
+    raw = raw.strip()
 
-    # Strip markdown fences if Claude wrapped the response
     if raw.startswith("```"):
         raw = raw.split("```")[1]
         if raw.startswith("json"):
