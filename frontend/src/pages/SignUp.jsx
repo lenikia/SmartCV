@@ -53,9 +53,9 @@ function SignUp() {
     <div className="auth-page">
       <div className="auth-wrapper">
         <div className="auth-brand-row">
-          <Link to="/" className="brand auth-brand">
+          <Link to="/dashboard" className="brand auth-brand">
             <div className="brand-mark">S</div>
-            <span>SmartCV</span>
+            <span className="brand-text"><span className="brand-text-main">Re</span><span className="brand-text-accent">SUME</span><span className="brand-text-main">ai</span></span>
           </Link>
         </div>
 

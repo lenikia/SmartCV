@@ -4,6 +4,7 @@ import SignUp from "./pages/SignUp";
 import SignIn from "./pages/SignIn";
 import Dashboard from "./pages/Dashboard";
 import CVBuilder from "./pages/CVBuilder";
+import JobApplication from "./pages/JobApplication";
 import ResumeChecker from "./pages/ResumeChecker";
 import ATSScore from "./pages/ATSScore";
 import Templates from "./pages/Templates";
@@ -21,7 +22,10 @@ function App() {
         <Route path="/signup" element={<SignUp />} />
         <Route path="/signin" element={<SignIn />} />
         <Route path="/dashboard" element={<Dashboard />} />
+        <Route path="/profile" element={<CVBuilder />} />
         <Route path="/cv-builder" element={<CVBuilder />} />
+        <Route path="/job-application" element={<JobApplication />} />
+        <Route path="/resume-checker/:resumeId" element={<ResumeChecker />} />
         <Route path="/resume-checker" element={<ResumeChecker />} />
         <Route path="/ats-score" element={<ATSScore />} />
         <Route path="/templates" element={<Templates />} />
