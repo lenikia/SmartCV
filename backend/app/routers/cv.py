@@ -1,286 +1,209 @@
-from fastapi import APIRouter, HTTPException, UploadFile, File, Query, Form
-from typing import List, Optional
+from fastapi import APIRouter, Depends, HTTPException, status
+from sqlalchemy.orm import Session
+from typing import List
 from datetime import datetime
-from app.schemas.cv import CVData, PersonalInfo, Experience, Project, Education, ATSAnalysis, ATSStatus, RoleType
-from app.utils.cv_parser import (
-    extract_text_from_pdf, extract_text_from_docx, parse_cv_text,
-    calculate_ats_score, match_positions_to_cv, get_cv_grade
+from app.database import get_db
+from app.models.cv import CV
+from app.models.user import User
+from app.schemas.cv import CVCreate, CVResponse
+from app.utils.dependencies import get_current_user
+from fastapi.responses import StreamingResponse
+from reportlab.lib.pagesizes import A4
+from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+from reportlab.lib.units import cm
+from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, HRFlowable
+from reportlab.lib import colors
+import io
+
+router = APIRouter(prefix="/cv", tags=["CV"])
+
+
+@router.post("/", response_model=CVResponse)
+def create_cv(
+    cv_data: CVCreate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    new_cv = CV(
+    user_id=current_user.id,
+    title=cv_data.title or f"My CV - {datetime.now().strftime('%Y-%m-%d %H:%M')}",
+    personal_info=cv_data.personal_info,
+    summary=cv_data.summary,
+    education=cv_data.education,
+    skills=cv_data.skills,
+    experience=cv_data.experience,
+    projects=cv_data.projects,
+    template=cv_data.template or "minimal",
 )
 
-router = APIRouter(prefix="/api/cv", tags=["CV Management"])
+    db.add(new_cv)
+    db.commit()
+    db.refresh(new_cv)
+    return new_cv
 
-# In-memory storage (replace with database later)
-cv_storage = {}
-cv_id_counter = 1
-user_cvs = {1: []}  # Default user_id 1
 
-def save_cv_to_storage(cv_data: CVData) -> int:
-    global cv_id_counter
-    cv_data.id = cv_id_counter
-    cv_data.created_at = datetime.now()
-    cv_data.updated_at = datetime.now()
-    cv_storage[cv_id_counter] = cv_data
-    user_cvs[1].append(cv_id_counter)
-    cv_id_counter += 1
-    return cv_data.id
+@router.get("/", response_model=List[CVResponse])
+def get_my_cvs(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    return db.query(CV).filter(
+        CV.user_id == current_user.id
+    ).order_by(CV.created_at.desc()).all()
 
-# 1. Upload CV file
-@router.post("/upload")
-async def upload_cv(file: UploadFile = File(...)):
-    """Upload CV file (PDF, DOCX, or TXT) and analyze it"""
-    
-    # Validate file type
-    allowed_types = [
-        "application/pdf",
-        "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-        "text/plain"
-    ]
-    
-    if file.content_type not in allowed_types:
+
+@router.get("/{cv_id}", response_model=CVResponse)
+def get_cv(
+    cv_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    cv = db.query(CV).filter(
+        CV.id == cv_id,
+        CV.user_id == current_user.id
+    ).first()
+
+    if not cv:
         raise HTTPException(
-            status_code=400,
-            detail="Only PDF, DOCX, or TXT files allowed"
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="CV not found"
         )
-    
-    # Read file
-    contents = await file.read()
-    
-    # Extract text based on file type
-    text = ""
-    if file.content_type == "application/pdf":
-        text = extract_text_from_pdf(contents)
-    elif file.content_type == "application/vnd.openxmlformats-officedocument.wordprocessingml.document":
-        text = extract_text_from_docx(contents)
-    else:
-        text = contents.decode("utf-8")
-    
-    if not text.strip():
-        raise HTTPException(status_code=400, detail="Could not extract text from file")
-    
-    # Parse CV text
-    parsed_data = parse_cv_text(text)
-    
-    # Calculate ATS score
-    ats_result = calculate_ats_score(parsed_data)
-    
-    # Match positions
-    matched_positions = match_positions_to_cv(parsed_data, ats_result["score"])
-    
-    # Create CV object
-    cv_data = CVData(
-        version_name="Uploaded CV",
-        role_type=RoleType.GENERAL,
-        personalInfo=PersonalInfo(**parsed_data["personalInfo"]),
-        summary=parsed_data["summary"],
-        skills=parsed_data["skills"],
-        education=[],
-        experience=[],
-        projects=[],
-        ats_analysis=ATSAnalysis(
-            status=ATSStatus.PASSED if ats_result["score"] >= 60 else ATSStatus.FAILED,
-            score=ats_result["score"],
-            keywords_matched=ats_result["keywords_matched"],
-            keywords_missing=ats_result["keywords_missing"],
-            suggestions=ats_result["suggestions"],
-            analyzed_at=datetime.now()
+    return cv
+
+
+@router.put("/{cv_id}", response_model=CVResponse)
+def update_cv(
+    cv_id: int,
+    cv_data: CVCreate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    cv = db.query(CV).filter(
+        CV.id == cv_id,
+        CV.user_id == current_user.id
+    ).first()
+
+    if not cv:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="CV not found"
         )
-    )
-    
-    # Save to storage
-    cv_id = save_cv_to_storage(cv_data)
-    
-    return {
-        "message": "CV uploaded and analyzed successfully",
-        "cv_id": cv_id,
-        "ats_score": ats_result["score"],
-        "grade": get_cv_grade(ats_result["score"]),
-        "matched_positions": matched_positions,
-        "suggestions": ats_result["suggestions"],
-        "keywords_matched": ats_result["keywords_matched"],
-        "keywords_missing": ats_result["keywords_missing"],
-        "redirect_url": f"/cv/{cv_id}/edit"
-    }
 
-# 2. Create blank CV
-@router.post("/create-blank")
-async def create_blank_cv():
-    """Create a new blank CV"""
-    blank_cv = CVData(
-        version_name="My New CV",
-        personalInfo=PersonalInfo(
-            fullName="Your Name",
-            email="your@email.com"
-        ),
-        summary="Write your professional summary here...",
-        skills=[],
-        education=[],
-        experience=[],
-        projects=[]
-    )
-    
-    cv_id = save_cv_to_storage(blank_cv)
-    
-    return {
-        "message": "New blank CV created",
-        "cv_id": cv_id,
-        "redirect_url": f"/cv/{cv_id}/edit"
-    }
+    cv.title = cv_data.title or cv.title
+    cv.personal_info = cv_data.personal_info
+    cv.summary = cv_data.summary
+    cv.education = cv_data.education
+    cv.skills = cv_data.skills
+    cv.experience = cv_data.experience
+    cv.projects = cv_data.projects
+    cv.template = cv_data.template or cv.template
+    cv.updated_at = datetime.utcnow()
 
-# 3. Get CV for viewing
-@router.get("/{cv_id}/view")
-async def view_cv(cv_id: int):
-    """Get CV data formatted for CV page"""
-    if cv_id not in cv_storage:
-        raise HTTPException(status_code=404, detail="CV not found")
-    
-    cv = cv_storage[cv_id]
-    cv.view_count += 1
-    
-    return {
-        "cv_id": cv_id,
-        "view_mode": "view",
-        "cv_data": cv,
-        "page_title": f"{cv.personalInfo.fullName} - CV",
-        "sections": {
-            "personal_info": cv.personalInfo,
-            "summary": cv.summary,
-            "skills": cv.skills,
-            "experience": cv.experience,
-            "education": cv.education,
-            "projects": cv.projects
-        },
-        "ats_status": cv.ats_analysis.status if cv.ats_analysis else "pending",
-        "ats_score": cv.ats_analysis.score if cv.ats_analysis else None
-    }
+    db.commit()
+    db.refresh(cv)
+    return cv
 
-# 4. Get CV for editing
-@router.get("/{cv_id}/edit")
-async def edit_cv(cv_id: int):
-    """Get CV data for editing"""
-    if cv_id not in cv_storage:
-        raise HTTPException(status_code=404, detail="CV not found")
-    
-    cv = cv_storage[cv_id]
-    
-    return {
-        "cv_id": cv_id,
-        "edit_mode": True,
-        "cv_data": cv,
-        "suggestions": cv.ats_analysis.suggestions if cv.ats_analysis else []
-    }
 
-# 5. Update CV
-@router.put("/{cv_id}")
-async def update_cv(cv_id: int, cv_data: CVData):
-    """Update entire CV"""
-    if cv_id not in cv_storage:
-        raise HTTPException(status_code=404, detail="CV not found")
-    
-    cv_data.id = cv_id
-    cv_data.updated_at = datetime.now()
-    cv_data.created_at = cv_storage[cv_id].created_at
-    
-    # Recalculate ATS score
-    ats_result = calculate_ats_score(cv_data.dict())
-    cv_data.ats_analysis = ATSAnalysis(
-        status=ATSStatus.PASSED if ats_result["score"] >= 60 else ATSStatus.FAILED,
-        score=ats_result["score"],
-        keywords_matched=ats_result["keywords_matched"],
-        keywords_missing=ats_result["keywords_missing"],
-        suggestions=ats_result["suggestions"],
-        analyzed_at=datetime.now()
-    )
-    
-    cv_storage[cv_id] = cv_data
-    
-    return {"message": "CV updated successfully", "cv_data": cv_data}
-
-# 6. Update personal info across all CVs
-@router.put("/personal-info/update-all")
-async def update_all_cvs_personal_info(personal_info: PersonalInfo, user_id: int = 1):
-    """Update personal information in ALL CVs"""
-    updated_cvs = []
-    for cv_id in user_cvs.get(user_id, []):
-        if cv_id in cv_storage:
-            cv_storage[cv_id].personalInfo = personal_info
-            cv_storage[cv_id].updated_at = datetime.now()
-            updated_cvs.append(cv_id)
-    
-    return {
-        "message": f"Updated {len(updated_cvs)} CVs",
-        "updated_cvs": updated_cvs
-    }
-
-# 7. Update skills across all CVs
-@router.put("/skills/update-all")
-async def update_all_cvs_skills(skills: List[str], user_id: int = 1):
-    """Update skills in ALL CVs"""
-    updated_cvs = []
-    for cv_id in user_cvs.get(user_id, []):
-        if cv_id in cv_storage:
-            cv_storage[cv_id].skills = skills
-            cv_storage[cv_id].updated_at = datetime.now()
-            
-            # Recalculate ATS
-            ats_result = calculate_ats_score(cv_storage[cv_id].dict())
-            cv_storage[cv_id].ats_analysis.score = ats_result["score"]
-            updated_cvs.append(cv_id)
-    
-    return {
-        "message": f"Updated skills in {len(updated_cvs)} CVs",
-        "updated_cvs": updated_cvs
-    }
-
-# 8. Get all CVs
-@router.get("/all")
-async def get_all_cvs(user_id: int = 1):
-    """Get all CVs for a user"""
-    user_cv_list = []
-    for cv_id in user_cvs.get(user_id, []):
-        if cv_id in cv_storage:
-            user_cv_list.append(cv_storage[cv_id])
-    
-    return {
-        "total": len(user_cv_list),
-        "cvs": user_cv_list
-    }
-
-# 9. Delete CV
 @router.delete("/{cv_id}")
-async def delete_cv(cv_id: int, user_id: int = 1):
-    """Delete a CV"""
-    if cv_id not in cv_storage:
-        raise HTTPException(status_code=404, detail="CV not found")
-    
-    del cv_storage[cv_id]
-    if cv_id in user_cvs[user_id]:
-        user_cvs[user_id].remove(cv_id)
-    
-    return {"message": f"CV {cv_id} deleted successfully"}
+def delete_cv(
+    cv_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    cv = db.query(CV).filter(
+        CV.id == cv_id,
+        CV.user_id == current_user.id
+    ).first()
 
-# 10. Quick start options for homepage
-@router.get("/quick-start/options")
-async def get_quick_start_options():
-    """Get options for homepage quick start"""
-    return {
-        "options": [
-            {
-                "id": "create_new",
-                "label": "Create from Scratch",
-                "description": "Build your CV step by step",
-                "icon": "plus",
-                "endpoint": "/api/cv/create-blank",
-                "method": "POST"
-            },
-            {
-                "id": "upload_existing",
-                "label": "Upload Existing CV",
-                "description": "Upload PDF/DOCX and optimize",
-                "icon": "upload",
-                "endpoint": "/api/cv/upload",
-                "method": "POST",
-                "accepts_file": True
-            }
-        ],
-        "featured_roles": ["Frontend Developer", "Backend Developer", "Data Scientist", "DevOps Engineer"]
-    }
+    if not cv:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="CV not found"
+        )
+
+    db.delete(cv)
+    db.commit()
+    return {"message": "CV deleted successfully"}
+
+
+@router.get("/{cv_id}/export")
+def export_cv(
+    cv_id: int,
+    format: str = "pdf",
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    cv = db.query(CV).filter(CV.id == cv_id, CV.user_id == current_user.id).first()
+    if not cv:
+        raise HTTPException(status_code=404, detail="CV not found")
+
+    if format != "pdf":
+        raise HTTPException(status_code=400, detail="Only 'pdf' format is supported currently")
+
+    buffer = io.BytesIO()
+    doc = SimpleDocTemplate(
+        buffer, pagesize=A4,
+        rightMargin=2*cm, leftMargin=2*cm,
+        topMargin=2*cm, bottomMargin=2*cm
+    )
+
+    styles = getSampleStyleSheet()
+    name_style = ParagraphStyle("Name", fontSize=20, fontName="Helvetica-Bold", spaceAfter=4)
+    title_style = ParagraphStyle("Title", fontSize=12, textColor=colors.HexColor("#555555"), spaceAfter=2)
+    section_style = ParagraphStyle("Section", fontSize=12, fontName="Helvetica-Bold", spaceBefore=12, spaceAfter=4, textColor=colors.HexColor("#1a1a2e"))
+    body_style = styles["Normal"]
+
+    story = []
+    info = cv.personal_info or {}
+
+    # Header
+    story.append(Paragraph(info.get("fullName", ""), name_style))
+    if info.get("professionalTitle"):
+        story.append(Paragraph(info["professionalTitle"], title_style))
+
+    contact_parts = [p for p in [info.get("email"), info.get("phone"), info.get("location")] if p]
+    if contact_parts:
+        story.append(Paragraph(" · ".join(contact_parts), body_style))
+
+    story.append(HRFlowable(width="100%", thickness=1, color=colors.HexColor("#1a1a2e"), spaceAfter=8))
+
+    # Summary
+    if cv.summary:
+        story.append(Paragraph("PROFILE", section_style))
+        story.append(Paragraph(cv.summary, body_style))
+
+    # Experience
+    if cv.experience:
+        story.append(Paragraph("EXPERIENCE", section_style))
+        for exp in cv.experience:
+            story.append(Paragraph(f"<b>{exp.get('position', '')}</b> — {exp.get('company', '')}", body_style))
+            date_range = f"{exp.get('startDate', '')} – {exp.get('endDate', 'Present')}"
+            story.append(Paragraph(date_range, ParagraphStyle("Date", fontSize=9, textColor=colors.grey)))
+            if exp.get("description"):
+                story.append(Paragraph(exp["description"], body_style))
+            story.append(Spacer(1, 6))
+
+    # Education
+    if cv.education:
+        story.append(Paragraph("EDUCATION", section_style))
+        ed = cv.education if isinstance(cv.education, dict) else {}
+        line = f"<b>{ed.get('degree', '')}</b> — {ed.get('institution', '')}"
+        story.append(Paragraph(line, body_style))
+        if ed.get("graduationYear"):
+            story.append(Paragraph(str(ed["graduationYear"]), body_style))
+        story.append(Spacer(1, 6))
+
+    # Skills
+    if cv.skills:
+        story.append(Paragraph("SKILLS", section_style))
+        story.append(Paragraph(", ".join(cv.skills), body_style))
+
+    doc.build(story)
+    buffer.seek(0)
+
+    filename = f"cv_{cv.title.replace(' ', '_') if cv.title else cv_id}.pdf"
+    return StreamingResponse(
+        buffer,
+        media_type="application/pdf",
+        headers={"Content-Disposition": f"attachment; filename={filename}"}
+    )

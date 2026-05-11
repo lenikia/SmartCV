@@ -1,0 +1,16 @@
+# Python
+venv/
+__pycache__/
+*.pyc
+*.pyo
+.env
+
+# Database — never commit the actual SQLite file
+*.db
+*.sqlite3
+
+# Mac
+.DS_Store
+
+# Uploads folder (user files)
+uploads/

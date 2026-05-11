@@ -12,6 +12,8 @@ import About from "./pages/About";
 import Contact from "./pages/Contact";
 import Pricing from "./pages/Pricing";
 import Privacy from "./pages/Privacy";
+import Profile from "./pages/Profile";
+
 import "./App.css";
 
 function App() {
@@ -27,6 +29,7 @@ function App() {
         <Route path="/job-application" element={<JobApplication />} />
         <Route path="/resume-checker/:resumeId" element={<ResumeChecker />} />
         <Route path="/resume-checker" element={<ResumeChecker />} />
+        <Route path="/profile" element={<Profile />} />
         <Route path="/ats-score" element={<ATSScore />} />
         <Route path="/templates" element={<Templates />} />
         <Route path="/about" element={<About />} />
