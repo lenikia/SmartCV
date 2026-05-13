@@ -12,6 +12,7 @@ import Contact from "./pages/Contact";
 import Pricing from "./pages/Pricing";
 import Privacy from "./pages/Privacy";
 import Profile from "./pages/Profile";
+import CVPreview from "./pages/CVPreview";
 
 import "./App.css";
 
@@ -19,6 +20,7 @@ function App() {
   return (
     <BrowserRouter>
       <Routes>
+        <Route path="/cv-preview" element={<CVPreview />} />
         <Route path="/" element={<Home />} />
         <Route path="/signup" element={<SignUp />} />
         <Route path="/signin" element={<SignIn />} />
