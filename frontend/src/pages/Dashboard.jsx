@@ -4,6 +4,7 @@ import { getProfile } from "../api/profile";
 import { getCVs, deleteCV, createCV, generateCVFromUrl } from "../api/cv";
 import { createSection } from "../api/cv_sections";
 import { getJobs, getJobPreferences } from "../api/jobs";
+import { extractProfileFromCV } from "../api/profile";
 import { getApplications, createApplication, updateApplication, deleteApplication } from "../api/applications";
 
 // ── Status badge colours ───────────────────────────────────
@@ -171,6 +172,20 @@ function Dashboard() {
         } catch (err) { setCvsError(err.message); }
     };
 
+    const handleCVUploadForProfile = async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+
+    try {
+        setCvsError("");
+        const extracted = await extractProfileFromCV(file);
+        sessionStorage.setItem("extracted_profile", JSON.stringify(extracted));
+        navigate("/profile?from=upload");
+    } catch (err) {
+        setCvsError(`CV upload failed: ${err.message}`);
+    }
+};
+
     const handleQuickCV = async () => {
         if (!jobUrl.trim()) { setQuickCVError("Please paste a job posting URL."); return; }
         if (!jobUrl.startsWith("http")) { setQuickCVError("Please enter a valid URL starting with http or https."); return; }
@@ -316,6 +331,30 @@ function Dashboard() {
                             <h1>Welcome back, {user?.first_name || "..."}</h1>
                             <p>Manage your CVs, track applications, and find live job listings.</p>
                         </div>
+
+                        {/* Profile setup prompt — show if profile has no about_me yet */}
+                        {user && !user.about_me && (
+                            <div className="profile-setup-prompt">
+                                <p>
+                                    Complete your profile to unlock AI-powered CV generation.
+                                    Takes <strong>5–12 minutes</strong> on average.
+                                </p>
+                                <div className="profile-setup-actions">
+                                    <label className="primary-btn" style={{ cursor: "pointer" }}>
+                                        📄 Upload Existing CV
+                                        <input
+                                            type="file"
+                                            accept=".pdf,.docx"
+                                            style={{ display: "none" }}
+                                            onChange={handleCVUploadForProfile}
+                                        />
+                                    </label>
+                                    <Link to="/profile" className="secondary-btn nav-link-btn">
+                                        ✏️ Fill in Profile
+                                    </Link>
+                                </div>
+                            </div>
+                        )}
                     </section>
 
                     {/* Tabs */}

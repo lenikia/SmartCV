@@ -5,9 +5,9 @@ function About() {
     <div className="about-page">
       <header className="dashboard-topbar">
         <div className="container dashboard-topbar-content">
-          <Link to="/" className="brand auth-brand">
+          <Link to="/dashboard" className="brand auth-brand">
             <div className="brand-mark">S</div>
-            <span>SmartCV</span>
+            <span className="brand-text"><span className="brand-text-main">Re</span><span className="brand-text-accent">SUME</span><span className="brand-text-main">ai</span></span>
           </Link>
 
           <div className="dashboard-topbar-actions">
