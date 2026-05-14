@@ -51,6 +51,34 @@ function Profile() {
     useEffect(() => {
         const token = localStorage.getItem("token");
         if (!token) { navigate("/signin"); return; }
+        const extracted = sessionStorage.getItem("extracted_profile");
+        if (extracted) {
+            const data = JSON.parse(extracted);
+            sessionStorage.removeItem("extracted_profile");
+            setIsNew(true);
+            setForm(prev => ({
+                ...prev,
+                first_name: data.first_name || "",
+                last_name: data.last_name || "",
+                email: data.email || "",
+                phone: data.phone || "",
+                address: data.address || "",
+                country: data.country || "",
+                preferred_job_title: data.preferred_job_title || "",
+                brief_intro: data.brief_intro || "",
+                about_me: data.about_me || "",
+                skills: data.skills || { programming: [], tools: [], other: [] },
+                experience: data.experience || [],
+                university_projects: data.university_projects || [],
+                personal_projects: data.personal_projects || [],
+                soft_skills: data.soft_skills || [],
+                interests: data.interests || [],
+                education: data.education || [],
+                languages: data.languages || []
+            }));
+            setLoading(false);
+            return;
+        }
 
         getProfile()
             .then(profile => {

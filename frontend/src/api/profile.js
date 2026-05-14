@@ -41,3 +41,19 @@ export async function updateProfile(profileData) {
     if (!response.ok) throw new Error(data.detail || "Failed to update profile");
     return data;
 }
+export async function extractProfileFromCV(file) {
+    const formData = new FormData();
+    formData.append("file", file);
+
+    const response = await fetch(`${BASE_URL}/api/v1/profile/extract-from-cv`, {
+        method: "POST",
+        headers: {
+            "Authorization": `Bearer ${localStorage.getItem("token")}`
+        },
+        body: formData
+    });
+
+    const data = await response.json();
+    if (!response.ok) throw new Error(data.detail || "Failed to extract profile from CV");
+    return data;
+}
