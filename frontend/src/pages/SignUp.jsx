@@ -1,5 +1,6 @@
 import { Link, useNavigate } from "react-router-dom";
 import { useState } from "react";
+import { signup } from "../api/auth";
 
 function SignUp() {
   const navigate = useNavigate();
@@ -20,35 +21,25 @@ function SignUp() {
     }));
   };
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
-
-    if (
-      !formData.fullName.trim() ||
-      !formData.email.trim() ||
-      !formData.password.trim() ||
-      !formData.confirmPassword.trim()
-    ) {
-      setError("Please fill in all fields.");
-      return;
+    if (!formData.fullName.trim() || !formData.email.trim() || !formData.password.trim()) {
+        setError("Please fill in all fields.");
+        return;
     }
-
     if (formData.password !== formData.confirmPassword) {
-      setError("Passwords do not match.");
-      return;
+        setError("Passwords do not match.");
+        return;
     }
-
     setError("");
-
-    // Temporary simulation while the backend is not ready 
-    localStorage.setItem("mockAuth", "true");
-    localStorage.setItem("mockUserName", formData.fullName);
-    localStorage.setItem("mockUserEmail", formData.email);
-
-    // then we switch to /dashboard;
-    navigate("/dashboard");
-  };
-
+    try {
+        const data = await signup(formData.fullName, formData.email, formData.password);
+        localStorage.setItem("token", data.access_token);
+        navigate("/signin");
+    } catch (err) {
+        setError(err.message || "Could not create account.");
+    }
+};
   return (
     <div className="auth-page">
       <div className="auth-wrapper">

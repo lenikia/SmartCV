@@ -124,19 +124,23 @@ function Profile() {
         setSaving(true);
 
         try {
-            if (isNew) {
-                await createProfile(form);
-                setIsNew(false);
-            } else {
-                await updateProfile(form);
-            }
-            setSaveSuccess(true);
-            setTimeout(() => setSaveSuccess(false), 3000);
-        } catch (err) {
-            setError(err.message);
-        } finally {
-            setSaving(false);
+    if (isNew) {
+        try {
+            await createProfile(form);
+        } catch {
+            await updateProfile(form);
         }
+        setIsNew(false);
+    } else {
+        await updateProfile(form);
+    }
+    setSaveSuccess(true);
+    setTimeout(() => navigate("/dashboard"), 1500);
+} catch (err) {
+    setError(err.message);
+} finally {
+    setSaving(false);
+}
     };
 
     // ── Field helpers ──────────────────────────────────────

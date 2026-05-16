@@ -1,5 +1,6 @@
 import { Link, useNavigate } from "react-router-dom";
 import { useState } from "react";
+import { login } from "../api/auth";
 
 function SignIn() {
   const navigate = useNavigate();
@@ -18,23 +19,21 @@ function SignIn() {
     }));
   };
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
-
     if (!formData.email.trim() || !formData.password.trim()) {
-      setError("Please enter your email and password.");
-      return;
+        setError("Please enter your email and password.");
+        return;
     }
-
     setError("");
-
-    // Temporary simulation while the backend is not ready 
-    localStorage.setItem("mockAuth", "true");
-    localStorage.setItem("mockUserEmail", formData.email);
-
-    // then we switch to /dashboard;
-    navigate("/dashboard");
-  };
+    try {
+        const data = await login(formData.email, formData.password);
+        localStorage.setItem("token", data.access_token);
+        navigate("/dashboard");
+    } catch (err) {
+        setError(err.message || "Invalid email or password.");
+    }
+};
 
   return (
     <div className="auth-page">
